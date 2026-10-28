@@ -19,12 +19,70 @@ function s3Configured(): boolean {
   );
 }
 
+const SUPABASE_STORAGE_BUCKET = process.env.SUPABASE_STORAGE_BUCKET || "darroom";
+
+function supabaseStorageConfigured(): boolean {
+  return Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SECRET_KEY);
+}
+
+function supabaseBaseUrl(): string {
+  return (process.env.NEXT_PUBLIC_SUPABASE_URL || "").replace(/\/$/, "");
+}
+
+function supabaseHeaders(): Record<string, string> {
+  const key = process.env.SUPABASE_SECRET_KEY || "";
+  return { apikey: key, Authorization: `Bearer ${key}` };
+}
+
+function encodeStorageKey(key: string): string {
+  return key.split("/").map((segment) => encodeURIComponent(segment)).join("/");
+}
+
+function supabaseObjectUrl(key: string, publicUrl = false): string {
+  const visibility = publicUrl ? "public/" : "";
+  return `${supabaseBaseUrl()}/storage/v1/object/${visibility}${SUPABASE_STORAGE_BUCKET}/${encodeStorageKey(key)}`;
+}
+
+async function generateSupabaseUploadUrl(
+  key: string,
+  expiresIn: number
+): Promise<{ uploadUrl: string; storageKey: string }> {
+  if (!isSafeStorageKey(key)) throw new Error("Invalid storage key.");
+  const response = await fetch(
+    `${supabaseBaseUrl()}/storage/v1/object/upload/sign/${SUPABASE_STORAGE_BUCKET}/${encodeStorageKey(key)}`,
+    {
+      method: "POST",
+      headers: { ...supabaseHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify({ expiresIn })
+    }
+  );
+  if (!response.ok) throw new Error("Could not create a media upload link.");
+  const data = (await response.json()) as { url?: string };
+  if (!data.url) throw new Error("Could not create a media upload link.");
+  return { uploadUrl: `${supabaseBaseUrl()}/storage/v1${data.url}`, storageKey: key };
+}
+
+async function supabaseObjectInfo(key: string): Promise<{ size: number; contentType?: string } | null> {
+  const response = await fetch(supabaseObjectUrl(key), { method: "HEAD", headers: supabaseHeaders() });
+  if (!response.ok) return null;
+  return {
+    size: Number(response.headers.get("content-length") || 0),
+    contentType: response.headers.get("content-type") || undefined
+  };
+}
+
+async function deleteSupabaseObject(key: string): Promise<void> {
+  const response = await fetch(supabaseObjectUrl(key), { method: "DELETE", headers: supabaseHeaders() });
+  if (!response.ok && response.status !== 404) throw new Error("Could not delete the media object.");
+}
+
 /**
- * Development fallback: when S3 is not configured, media is written to
- * `public/uploads` and served by Next.js. This is disabled in production.
+ * Development fallback: when neither S3 nor Supabase Storage is configured,
+ * media is written to `public/uploads` and served by Next.js. This is disabled
+ * in production.
  */
 export function localStorageEnabled(): boolean {
-  return !s3Configured() && process.env.NODE_ENV !== "production";
+  return !s3Configured() && !supabaseStorageConfigured() && process.env.NODE_ENV !== "production";
 }
 
 export function objectStorage(): { client: S3Client; bucket: string } {
@@ -156,12 +214,22 @@ export async function generateUploadUrl(
     if (!isSafeStorageKey(key)) throw new Error("Invalid storage key.");
     return { uploadUrl: localUploadUrl(key, contentType, expiresIn), storageKey: key };
   }
+  if (supabaseStorageConfigured()) {
+    return generateSupabaseUploadUrl(key, expiresIn);
+  }
   return generatePresignedUploadUrl(key, contentType, expiresIn, contentLength);
 }
 
 /** Returns metadata for an uploaded object, or null when it does not exist. */
 export async function objectInfo(key: string): Promise<{ size: number; contentType?: string } | null> {
   if (localStorageEnabled()) return localObjectInfo(key);
+  if (supabaseStorageConfigured()) {
+    try {
+      return await supabaseObjectInfo(key);
+    } catch {
+      return null;
+    }
+  }
   try {
     const { client, bucket } = objectStorage();
     const object = await client.send(new HeadObjectCommand({ Bucket: bucket, Key: key }));
@@ -173,6 +241,7 @@ export async function objectInfo(key: string): Promise<{ size: number; contentTy
 
 export async function deleteMediaObject(key: string): Promise<void> {
   if (localStorageEnabled()) return deleteLocalObject(key);
+  if (supabaseStorageConfigured()) return deleteSupabaseObject(key);
   const { client, bucket } = objectStorage();
   await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
 }
@@ -180,6 +249,7 @@ export async function deleteMediaObject(key: string): Promise<void> {
 export function getMediaUrl(storageKey: string): string | null {
   const baseUrl = process.env.MEDIA_PUBLIC_BASE_URL?.replace(/\/$/, "");
   if (baseUrl) return `${baseUrl}/${storageKey}`;
+  if (supabaseStorageConfigured()) return supabaseObjectUrl(storageKey, true);
   if (localStorageEnabled()) return `${LOCAL_MEDIA_URL_PREFIX}/${storageKey}`;
   return null;
 }
