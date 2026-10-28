@@ -55,14 +55,14 @@ export default function FAQPage() {
               <summary style={{ cursor: "pointer", fontWeight: "bold", marginBottom: "10px" }}>
                 How much does a subscription cost?
               </summary>
-              <p>A subscription is TSh 5,000 for 30 days. There are also Premium (TSh 15,000) and Featured (TSh 30,000) plans with additional features.</p>
+              <p>A subscription is TSh 5,000 for 30 days. There is one plan for all Agents, with no tiers and no extra charges.</p>
             </details>
 
             <details style={{ marginBottom: "20px" }}>
               <summary style={{ cursor: "pointer", fontWeight: "bold", marginBottom: "10px" }}>
                 What can I do with a subscription?
               </summary>
-              <p>With a subscription, you can add listings, edit them, upload photos, view analytics, and more. The number of listings depends on your plan.</p>
+              <p>With a subscription, you can add up to 10 listings, edit them, upload up to 10 photos per listing, view analytics, and more.</p>
             </details>
 
             <details style={{ marginBottom: "20px" }}>
