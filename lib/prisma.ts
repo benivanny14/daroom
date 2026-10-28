@@ -5,7 +5,14 @@ const globalForPrisma = globalThis as typeof globalThis & {
   darRoomPrisma?: PrismaClient;
 };
 
+/**
+ * `DATABASE_POOL_URL` lets the runtime use Supabase's transaction pooler while
+ * `prisma migrate deploy` keeps using the session pooler on `DATABASE_URL`.
+ * Serverless functions multiply connections, and the session pooler only allows
+ * ~15 clients in total.
+ */
 const connectionString =
+  process.env.DATABASE_POOL_URL ||
   process.env.DATABASE_URL ||
   "postgresql://unconfigured:unconfigured@127.0.0.1:1/darroom";
 
