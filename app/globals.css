@@ -293,14 +293,6 @@ img { max-width: 100%; }
   .dashboard-actions .wide-button { width: 100%; }
 }
 .plan-price { margin: 19px 0 4px; font: clamp(30px, 4vw, 40px) Georgia, serif; letter-spacing: -.05em; }
-.plan-picker { display: grid; gap: 8px; margin: 14px 0; padding: 12px; border: 1px solid var(--line); background: var(--field); }
-.plan-picker legend { padding: 0 6px; font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
-.plan-option { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 4px 10px; padding: 9px 10px; border: 1px solid var(--line); background: var(--surface); cursor: pointer; }
-.plan-option.selected { border-color: var(--green); background: var(--green-soft); }
-.plan-option input { grid-row: span 2; margin: 0; }
-.plan-option-name { font-weight: 700; font-size: 14px; }
-.plan-option-price { font: 16px Georgia, serif; letter-spacing: -.03em; }
-.plan-option small { grid-column: 2 / -1; color: var(--muted); font-size: 11.5px; line-height: 1.45; }
 .status.featured { background: var(--amber-soft); color: var(--amber); }
 .plan-price small { color: var(--muted); font: 13px "Aptos", "Segoe UI", sans-serif; letter-spacing: 0; }
 .wide-button { width: 100%; min-height: 46px; display: block; padding: 12px 15px; border: 0; background: var(--action); color: #fff; font-size: 14px; font-weight: 750; text-align: center; }
