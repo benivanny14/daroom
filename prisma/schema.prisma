@@ -1,0 +1,376 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  // The pg_trgm extension used by the search indexes is created in the
+  // migration SQL; Prisma 7 only tracks `extensions` behind a preview flag.
+}
+
+enum UserRole {
+  DALALI
+  ADMIN
+  TENANT
+}
+
+enum ListingStatus {
+  PENDING
+  APPROVED
+  FLAGGED
+  HIDDEN
+  REJECTED
+  EXPIRED
+}
+
+enum ReportStatus {
+  OPEN
+  REVIEWED
+  DISMISSED
+}
+
+enum PaymentStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  EXPIRED
+}
+
+enum SubscriptionPlan {
+  BASIC
+  PREMIUM
+  FEATURED
+}
+
+enum TokenPurpose {
+  VERIFY_EMAIL
+  RESET_PASSWORD
+}
+
+model User {
+  id              String           @id @default(cuid())
+  name            String
+  phone           String           @unique
+  email           String           @unique
+  passwordHash    String
+  isEmailVerified Boolean          @default(false)
+  isActive        Boolean          @default(true)
+  sessionVersion  Int              @default(0)
+  role            UserRole          @default(DALALI)
+  /// Base32 TOTP shared secret; active only while totpEnabled is true.
+  totpSecret      String?
+  totpEnabled     Boolean           @default(false)
+  /// JSON array of SHA-256 hashes of one-time backup codes.
+  totpBackupCodes String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  listings        Listing[]
+  subscriptions   Subscription[]
+  paymentEvents   PaymentEvent[]
+  authTokens      AuthToken[]
+  moderated       BlacklistEntry[] @relation("Moderator")
+  auditLogs       AdminAuditLog[]  @relation("AuditActor")
+  favorites       Favorite[]
+  reviews         Review[]
+  reportsMade     Report[]         @relation("Reporter")
+  appointments    ViewingAppointment[]
+  idVerification  IdVerification[]
+}
+
+model Region {
+  id        String     @id @default(cuid())
+  name      String     @unique
+  districts District[]
+}
+
+model District {
+  id            String         @id @default(cuid())
+  name          String         @unique
+  regionId      String
+  region        Region         @relation(fields: [regionId], references: [id], onDelete: Restrict)
+  neighborhoods Neighborhood[]
+  listings      Listing[]
+
+  @@index([regionId, name])
+}
+
+model Neighborhood {
+  id         String    @id @default(cuid())
+  name       String
+  districtId String
+  district   District       @relation(fields: [districtId], references: [id], onDelete: Restrict)
+  listings   Listing[]
+
+  @@unique([districtId, name])
+  @@index([districtId, name])
+  @@index([name(ops: raw("gin_trgm_ops"))], type: Gin, map: "Neighborhood_name_trgm_idx")
+}
+
+model Listing {
+  id             String         @id @default(cuid())
+  ownerId        String
+  districtId     String
+  neighborhoodId String
+  title          String
+  description    String
+  priceTzs       Int
+  minMonths      Int
+  luku           Boolean
+  water          String
+  phone          String
+  inspectionFeePolicyAcceptedAt DateTime?
+  status         ListingStatus  @default(APPROVED)
+  rejectionReason String?
+  isAvailable    Boolean        @default(true)
+  isFeatured     Boolean        @default(false)
+  featuredUntil  DateTime?
+  expiresAt      DateTime?
+  bedrooms       Int?
+  bathrooms      Int?
+  furnished      Boolean        @default(false)
+  allowsPets     Boolean        @default(false)
+  allowsStudents Boolean        @default(true)
+  latitude       Float?
+  longitude      Float?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  owner          User           @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  district       District       @relation(fields: [districtId], references: [id], onDelete: Restrict)
+  neighborhood   Neighborhood   @relation(fields: [neighborhoodId], references: [id], onDelete: Restrict)
+  photos         ListingPhoto[]
+  reports        Report[]
+  favorites      Favorite[]
+  reviews        Review[]
+  appointments   ViewingAppointment[]
+  analytics      ListingAnalytics?
+
+  @@index([status, districtId, neighborhoodId, priceTzs])
+  @@index([ownerId, status])
+  @@index([isFeatured, featuredUntil])
+  @@index([status, expiresAt])
+  // Trigram indexes keep the ILIKE '%term%' search fast on large inventories.
+  @@index([title(ops: raw("gin_trgm_ops"))], type: Gin, map: "Listing_title_trgm_idx")
+  @@index([description(ops: raw("gin_trgm_ops"))], type: Gin, map: "Listing_description_trgm_idx")
+  // Sort orders offered by the public listings endpoint.
+  @@index([status, createdAt], map: "Listing_status_createdAt_idx")
+  @@index([status, priceTzs], map: "Listing_status_priceTzs_idx")
+}
+
+model ListingPhoto {
+  id         String   @id @default(cuid())
+  listingId  String
+  storageKey String
+  altText    String
+  createdAt  DateTime @default(now())
+  listing    Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@unique([listingId, storageKey])
+}
+
+model Report {
+  id             String       @id @default(cuid())
+  listingId      String
+  reporterId     String?
+  reporterIpHash String?
+  category       String
+  details        String       @default("")
+  status         ReportStatus @default(OPEN)
+  createdAt      DateTime     @default(now())
+  reviewedAt     DateTime?
+  listing        Listing      @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  reporter       User?        @relation("Reporter", fields: [reporterId], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt])
+  @@index([listingId, status])
+  @@index([reporterId, createdAt])
+  @@index([reporterIpHash, listingId, createdAt])
+}
+
+model AdminAuditLog {
+  id         String   @id @default(cuid())
+  actorId    String
+  action     String
+  targetType String
+  targetId   String?
+  summary    String
+  metadata   Json?
+  ipHash     String?
+  createdAt  DateTime @default(now())
+  actor      User     @relation("AuditActor", fields: [actorId], references: [id], onDelete: Restrict)
+
+  @@index([createdAt])
+  @@index([actorId, createdAt])
+  @@index([targetType, targetId])
+}
+
+model AuthToken {
+  id        String       @id @default(cuid())
+  userId    String
+  tokenHash String       @unique
+  purpose   TokenPurpose
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime     @default(now())
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, purpose, expiresAt])
+}
+
+model Subscription {
+  id             String            @id @default(cuid())
+  userId         String
+  plan           SubscriptionPlan  @default(BASIC)
+  startsAt       DateTime
+  endsAt         DateTime
+  status         SubscriptionStatus @default(ACTIVE)
+  reminderSentAt DateTime?
+  createdAt      DateTime          @default(now())
+  user           User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, endsAt])
+}
+
+model PaymentEvent {
+  id                String           @id @default(cuid())
+  userId            String
+  provider          String
+  providerEventId   String?          @unique
+  reference         String           @unique
+  amountTzs         Int
+  plan              SubscriptionPlan @default(BASIC)
+  status            PaymentStatus
+  signatureVerified Boolean          @default(false)
+  checkoutUrl       String?
+  receivedAt        DateTime         @default(now())
+  verifiedAt        DateTime?
+  user              User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, receivedAt])
+  @@index([status, receivedAt])
+}
+
+model SiteSetting {
+  /// Single-row style settings keyed by name, e.g. "heroImage".
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
+model BlacklistEntry {
+  id              String   @id @default(cuid())
+  normalizedPhone String   @unique
+  normalizedEmail String?  @unique
+  reason          String
+  createdAt       DateTime @default(now())
+  moderatorId     String
+  moderator       User     @relation("Moderator", fields: [moderatorId], references: [id], onDelete: Restrict)
+}
+
+model RateLimitBucket {
+  key             String   @id
+  attempts        Int      @default(0)
+  windowStartedAt DateTime
+  updatedAt       DateTime @updatedAt
+
+  @@index([updatedAt])
+}
+
+model Favorite {
+  id        String   @id @default(cuid())
+  userId    String
+  listingId String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  listing   Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, listingId])
+  @@index([userId])
+  @@index([listingId])
+}
+
+model ViewingAppointment {
+  id          String   @id @default(cuid())
+  listingId   String
+  userId      String?
+  tenantName  String
+  tenantPhone String
+  tenantEmail String?
+  scheduledAt DateTime
+  status      String   @default("CONFIRMED")
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  listing     Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([listingId, scheduledAt])
+  @@index([userId, scheduledAt])
+}
+
+model Review {
+  id         String   @id @default(cuid())
+  listingId  String
+  userId     String?
+  authorName String   @default("Mpangaji")
+  rating     Int
+  comment    String
+  isVerified Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  listing    Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([listingId])
+  @@index([userId])
+}
+
+model ListingAnalytics {
+  id             String    @id @default(cuid())
+  listingId      String    @unique
+  views          Int       @default(0)
+  whatsappClicks Int       @default(0)
+  favorites      Int       @default(0)
+  inquiries      Int       @default(0)
+  lastViewedAt   DateTime?
+  updatedAt      DateTime  @updatedAt
+  listing        Listing   @relation(fields: [listingId], references: [id], onDelete: Cascade)
+}
+
+model PaymentMethod {
+  id          String   @id @default(cuid())
+  provider    String
+  methodName  String
+  isActive    Boolean  @default(true)
+  config      Json
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model StaticPage {
+  id        String   @id @default(cuid())
+  slug      String   @unique
+  title     String
+  content   String
+  published Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model IdVerification {
+  id             String    @id @default(cuid())
+  userId         String
+  documentType   String
+  documentUrl    String
+  status         String    @default("APPROVED")
+  rejectedReason String?
+  verifiedAt     DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+}

@@ -1,0 +1,11 @@
+node_modules/
+.next/
+.next-dev/
+out/
+coverage/
+public/uploads/
+.env
+.env.local
+*.tsbuildinfo
+*.log
+.smoke/
