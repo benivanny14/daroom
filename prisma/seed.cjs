@@ -134,55 +134,6 @@ async function main() {
     }
   });
 
-  // Seed payment methods
-  await prisma.paymentMethod.upsert({
-    where: { id: "selcom" },
-    update: {},
-    create: {
-      id: "selcom",
-      provider: "selcom",
-      methodName: "Selcom Payment Gateway",
-      isActive: true,
-      config: {}
-    }
-  });
-
-  await prisma.paymentMethod.upsert({
-    where: { id: "mpesa" },
-    update: {},
-    create: {
-      id: "mpesa",
-      provider: "mpesa",
-      methodName: "M-Pesa Tanzania",
-      isActive: false,
-      config: {}
-    }
-  });
-
-  await prisma.paymentMethod.upsert({
-    where: { id: "tigopesa" },
-    update: {},
-    create: {
-      id: "tigopesa",
-      provider: "tigopesa",
-      methodName: "Tigo Pesa",
-      isActive: false,
-      config: {}
-    }
-  });
-
-  await prisma.paymentMethod.upsert({
-    where: { id: "airtel" },
-    update: {},
-    create: {
-      id: "airtel",
-      provider: "airtel",
-      methodName: "Airtel Money",
-      isActive: false,
-      config: {}
-    }
-  });
-
   // Seed static pages
   await prisma.staticPage.upsert({
     where: { slug: "terms" },

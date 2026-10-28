@@ -52,27 +52,36 @@ Development uses `.next-dev`; production builds and `npm run start` use
 `.next`. Keeping these output directories separate prevents a build from
 overwriting the development server's compiled chunks.
 
-## Development-only fallbacks
+## Payments
 
-External services are optional locally. Two safe dev-only fallbacks keep the
-full flow working without credentials:
+SonicPesa is the only payment provider. It collects mobile money in Tanzania
+(M-Pesa, Tigo Pesa, Airtel Money, Halopesa) through a USSD/STK push that the
+customer approves on their own phone. DarRoom never asks for a mobile-money PIN.
+
+- **Agent subscription** (`app/api/payments/subscription/checkout`): the only
+  plan is TSh 5,000 for 30 days. The amount and plan are fixed on the server.
+  When the signed webhook confirms the payment, `lib/subscription-payments.ts`
+  marks the `PaymentEvent` as verified and adds a 30-day `Subscription` period
+  (a renewal extends the remaining time instead of replacing it).
+- **Tenant rent** (`app/api/payments/checkout`): the tenant enters an amount and
+  phone number on `/rent`. The route stores a `RentPayment` row and sends the
+  push; the webhook moves it to `PAID`, `FAILED`, or `CANCELLED`.
+- **Webhook** (`/api/payments/webhook`): verifies `X-SonicPesa-Signature`
+  (HMAC-SHA256 of the raw body using `SONICPESA_SECRET_KEY`) before changing
+  either record, rejects amount mismatches, and is idempotent.
+- **Status polling**: both checkouts expose `GET ...?paymentId=...&refresh=1`
+  so the UI can ask SonicPesa directly when a webhook is delayed.
+
+Set `SONICPESA_ACCESS_KEY`, `SONICPESA_SECRET_KEY`, and optionally
+`SONICPESA_BASE_URL`, then register the webhook URL in the SonicPesa dashboard.
+
+### Development-only fallback
 
 - **Media storage** (`lib/storage.ts`): when `S3_*` variables are empty and
   `NODE_ENV` is not `production`, uploads are written to `public/uploads` and
   served as `/uploads/...`. The signed PUT endpoint
   `app/api/uploads/local/route.ts` validates the HMAC signature, content type,
   magic bytes, and the 15 MB limit. This driver is disabled in production.
-- **Payments** (`lib/payments.ts`): when `PAYMENTS_MOCK="true"` and
-  `NODE_ENV` is not `production`, checkout returns
-  `/api/payments/mock/checkout`, which marks the pending payment as verified
-  and activates a subscription for the signed-in agent. Real Selcom
-  credentials are still required for agent subscriptions.
-- **SonicPesa rent payments** (`lib/sonicpesa.ts`): tenants can pay rent with
-  M-Pesa, Tigo Pesa, Airtel Money, or Halopesa from `/rent`. The checkout route
-  creates a `RentPayment` row, sends the USSD push, and the signed webhook at
-  `/api/payments/webhook` moves the row to `PAID`, `FAILED`, or `CANCELLED`.
-  Set `SONICPESA_ACCESS_KEY`, `SONICPESA_SECRET_KEY`, and optionally
-  `SONICPESA_BASE_URL`; register the webhook URL in the SonicPesa dashboard.
 
 Email is also optional. When `RESEND_API_KEY` and `EMAIL_FROM` are missing,
 `emailConfigured()` is false and the auth flow adapts instead of creating
@@ -221,7 +230,8 @@ lib/
   auth.ts                    sessions, origin checks, role guards
   listing-policy.ts          60-day listing expiry helpers
   storage.ts                 S3 driver + local dev fallback
-  payments.ts                dev mock payment switch
+  sonicpesa.ts               SonicPesa client, status mapping, webhook HMAC
+  subscription-payments.ts   verifies a paid subscription and extends access
   subscriptions.ts           entitlement rules
   subscriptions-plans.ts     plan limits and pricing
   rate-limit.ts              database-backed rate limiting
@@ -236,17 +246,18 @@ scripts/
 
 ## Production notes
 
-Do not enable `PAYMENTS_MOCK` or the local media driver in production. Configure
-`S3_*` and `MEDIA_PUBLIC_BASE_URL`, `SELCOM_*`, `SONICPESA_*`,
-`RESEND_API_KEY`/`EMAIL_FROM`, `CRON_SECRET` instead. Payment callbacks are
-signature-verified server-to-server before entitlement changes; never treat a
-browser redirect or callback parameter as proof of payment. Replace all seed
-credentials and use a managed PostgreSQL instance with backups.
+Do not enable the local media driver in production. Configure `S3_*` and
+`MEDIA_PUBLIC_BASE_URL`, `SONICPESA_*`, `RESEND_API_KEY`/`EMAIL_FROM`,
+`CRON_SECRET` instead. Payment callbacks are signature-verified
+server-to-server before entitlement changes; never treat a browser redirect or
+callback parameter as proof of payment. Replace all seed credentials and use a
+managed PostgreSQL instance with backups.
 
 For SonicPesa, set the webhook URL in the SonicPesa dashboard to
 `https://<your-domain>/api/payments/webhook`. The handler verifies the
 `X-SonicPesa-Signature` HMAC (SHA-256 of the raw body using
-`SONICPESA_SECRET_KEY`) before changing any `RentPayment` row.
+`SONICPESA_SECRET_KEY`) before changing any `RentPayment` or `PaymentEvent`
+row.
 
 ### Deploying to Vercel + Supabase
 
@@ -267,7 +278,7 @@ For SonicPesa, set the webhook URL in the SonicPesa dashboard to
 3. **Environment variables** — set every key from `.env.example` in the Vercel
    project (Production/Preview): `DATABASE_URL`, `DATABASE_POOL_URL` (port
    6543), `APP_URL` (the real https domain), `AUTH_SECRET` (≥ 32 random chars),
-   `ADMIN_*`, `CRON_SECRET`, `RESEND_API_KEY`/`EMAIL_FROM`, `SELCOM_*`, plus the
+   `ADMIN_*`, `CRON_SECRET`, `RESEND_API_KEY`/`EMAIL_FROM`, `SONICPESA_*`, plus the
    `NEXT_PUBLIC_SUPABASE_*` / `SUPABASE_SECRET_KEY` coordinates. Listing photos
    use Supabase Storage (`SUPABASE_STORAGE_BUCKET`, default `darroom`) whenever
    `NEXT_PUBLIC_SUPABASE_URL` and `SUPABASE_SECRET_KEY` are present; `S3_*` is
@@ -276,9 +287,9 @@ For SonicPesa, set the webhook URL in the SonicPesa dashboard to
 4. **Cron** — the `crons` block in `vercel.json` calls both endpoints daily
    (05:00 and 06:00 UTC; the Hobby plan allows one run per day per cron);
    `CRON_SECRET` must be set in Vercel or they return `401`.
-5. **Final gate** — confirm `PAYMENTS_MOCK` is unset/false, the local upload
-   driver stays disabled (it checks `NODE_ENV`), seed passwords are replaced,
-   and backups/point-in-time recovery are enabled on Supabase.
+5. **Final gate** — confirm the local upload driver stays disabled (it checks
+   `NODE_ENV`), seed passwords are replaced, and backups/point-in-time recovery
+   are enabled on Supabase.
 6. **Automatic deploys** — run `vercel git connect` once so every push to
    `main` builds and deploys to production. Run `vercel --prod` manually only
    for the first deploy or when the Git connection is unavailable.

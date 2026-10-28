@@ -243,17 +243,20 @@ model Subscription {
   @@index([userId, endsAt])
 }
 
+/// An agent subscription payment collected through SonicPesa. `providerOrderId`
+/// is the order id returned by SonicPesa `create_order`; the webhook matches
+/// callbacks to this row with it.
 model PaymentEvent {
   id                String           @id @default(cuid())
   userId            String
-  provider          String
-  providerEventId   String?          @unique
+  provider          String           @default("SONICPESA")
+  providerOrderId   String?          @unique
   reference         String           @unique
   amountTzs         Int
   plan              SubscriptionPlan @default(BASIC)
   status            PaymentStatus
   signatureVerified Boolean          @default(false)
-  checkoutUrl       String?
+  failureReason     String?
   receivedAt        DateTime         @default(now())
   verifiedAt        DateTime?
   user              User             @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -376,16 +379,6 @@ model ListingAnalytics {
   lastViewedAt   DateTime?
   updatedAt      DateTime  @updatedAt
   listing        Listing   @relation(fields: [listingId], references: [id], onDelete: Cascade)
-}
-
-model PaymentMethod {
-  id          String   @id @default(cuid())
-  provider    String
-  methodName  String
-  isActive    Boolean  @default(true)
-  config      Json
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
 }
 
 model StaticPage {

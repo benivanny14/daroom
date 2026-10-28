@@ -69,7 +69,7 @@ export default function FAQPage() {
               <summary style={{ cursor: "pointer", fontWeight: "bold", marginBottom: "10px" }}>
                 How do I pay?
               </summary>
-              <p>Subscription payments are initiated through the system shown on the dashboard. Availability depends on the service configuration for your account.</p>
+              <p>Agents pay the TSh 5,000 monthly subscription from the Agent dashboard with mobile money (M-Pesa, Tigo Pesa, Airtel Money or Halopesa). SonicPesa sends a prompt to your phone and you approve it with your own PIN; DarRoom never asks for your PIN.</p>
             </details>
 
             <details style={{ marginBottom: "20px" }}>

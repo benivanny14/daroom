@@ -3,27 +3,14 @@ import { redirect } from "next/navigation";
 import { DalaliDashboard } from "@/components/DalaliDashboard";
 import { getSessionUser } from "@/lib/auth";
 import { DarkModeToggle } from "@/components/DarkModeToggle";
-import { mockPaymentsEnabled } from "@/lib/payments";
 
 export const dynamic = "force-dynamic";
 
-export default async function DalaliPage({
-  searchParams
-}: {
-  searchParams: Promise<{ payment?: string }>;
-}) {
+export default async function DalaliPage() {
   const user = await getSessionUser();
   if (!user) redirect("/account?next=/dalali");
   if (user.role === "ADMIN") redirect("/admin");
   if (user.role === "TENANT") redirect("/account");
-  const { payment } = await searchParams;
-  const paymentNotice = payment === "success"
-    ? { tone: "notice", text: "Payment complete. Your subscription is now active." }
-    : payment === "failed" || payment === "invalid"
-      ? { tone: "admin-warning", text: "Payment was not completed. Try again or contact support." }
-      : payment === "pending"
-        ? { tone: "notice", text: "Payment is awaiting confirmation from the provider." }
-        : null;
 
   return (
     <>
@@ -43,8 +30,7 @@ export default async function DalaliPage({
           <h1>Hello, {user.name}.</h1>
           <p>Tenants contact you directly. Rent can optionally be paid through DarRoom&apos;s mobile-money page when you ask the tenant to use it.</p>
         </section>
-        {paymentNotice && <p className={paymentNotice.tone} role="status">{paymentNotice.text}</p>}
-        <DalaliDashboard user={{ id: user.id, name: user.name, email: user.email, phone: user.phone }} mockPayments={mockPaymentsEnabled()} payment={payment} />
+        <DalaliDashboard user={{ id: user.id, name: user.name, email: user.email, phone: user.phone }} />
       </main>
       <footer className="site-footer">
         <div className="shell footer-inner">

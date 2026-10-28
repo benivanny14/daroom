@@ -42,6 +42,14 @@ type Appointment = {
 
 type User = { id: string; name: string; email: string; phone: string };
 type Subscription = { active: boolean; endsAt: string; plan: string } | null;
+type SubscriptionPayment = {
+  id: string;
+  status: "PENDING" | "VERIFIED" | "REJECTED";
+  amountTzs: number;
+  orderId: string | null;
+  failureReason: string | null;
+  verifiedAt: string | null;
+};
 type ListingFilter = "all" | "available" | "rented" | "hidden" | "expired";
 type Analytics = {
   totalListings: number;
@@ -138,13 +146,9 @@ function isExpiringSoon(expiresAt?: string | null) {
 }
 
 export function DalaliDashboard({
-  user,
-  mockPayments = false,
-  payment
+  user
 }: {
   user: User;
-  mockPayments?: boolean;
-  payment?: string;
 }) {
   const [listings, setListings] = useState<Listing[]>([]);
   const [subscription, setSubscription] = useState<Subscription>(null);
@@ -155,6 +159,9 @@ export function DalaliDashboard({
   const [editingId, setEditingId] = useState("");
   const [creating, setCreating] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [paying, setPaying] = useState(false);
+  const [checkingPayment, setCheckingPayment] = useState(false);
+  const [payment, setPayment] = useState<SubscriptionPayment | null>(null);
 
   const [photoBusyId, setPhotoBusyId] = useState("");
   const [filter, setFilter] = useState<ListingFilter>("all");
@@ -259,11 +266,48 @@ export function DalaliDashboard({
     });
   }
 
+  // The SonicPesa webhook is the source of truth. Poll our own record while the
+  // prompt is open so the agent sees the activation without reloading the page.
+  const paymentId = payment?.id;
+  const paymentStatus = payment?.status;
+
   useEffect(() => {
-    if (autoOpenedForm.current || loading || payment !== "success" || !active) return;
-    autoOpenedForm.current = true;
-    openCreateForm();
-  }, [loading, payment, active, openCreateForm]);
+    if (!paymentId || paymentStatus !== "PENDING") return;
+    let stopped = false;
+
+    const poll = async () => {
+      try {
+        const response = await fetch(
+          `/api/payments/subscription/checkout?paymentId=${encodeURIComponent(paymentId)}`,
+          { cache: "no-store" }
+        );
+        if (!response.ok || stopped) return;
+        const body = await response.json();
+        const next = body.payment as SubscriptionPayment | undefined;
+        if (!next) return;
+        setPayment(next);
+        if (next.status === "VERIFIED") {
+          setError("");
+          setMessage("Payment received. Your subscription is active.");
+          await load();
+          if (!autoOpenedForm.current) {
+            autoOpenedForm.current = true;
+            openCreateForm();
+          }
+        } else if (next.status === "REJECTED") {
+          setError(next.failureReason || "The payment was not completed. Try again.");
+        }
+      } catch {
+        // A network hiccup must not hide the last known state; retry next tick.
+      }
+    };
+
+    const timer = setInterval(poll, 5000);
+    return () => {
+      stopped = true;
+      clearInterval(timer);
+    };
+  }, [paymentId, paymentStatus, load, openCreateForm]);
 
   useEffect(() => {
     if (!creating) return;
@@ -336,21 +380,64 @@ export function DalaliDashboard({
   }
 
   async function startCheckout() {
-    setBusy(true);
+    setPaying(true);
     setError("");
+    setMessage("");
+    setPayment(null);
     try {
-      const response = await fetch("/api/payments/selcom/checkout", {
+      const response = await fetch("/api/payments/subscription/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ phone: user.phone })
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Payment could not be started.");
-      window.location.assign(result.checkoutUrl);
+      const next = result.payment as SubscriptionPayment;
+      setPayment(next);
+      setMessage(result.message || "A payment prompt was sent to your phone.");
+      if (next.status === "VERIFIED") {
+        await load();
+        if (!autoOpenedForm.current) {
+          autoOpenedForm.current = true;
+          openCreateForm();
+        }
+      }
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Payment could not be started.");
     } finally {
-      setBusy(false);
+      setPaying(false);
+    }
+  }
+
+  async function checkPaymentNow() {
+    if (!payment || checkingPayment) return;
+    setCheckingPayment(true);
+    setError("");
+    try {
+      const response = await fetch(
+        `/api/payments/subscription/checkout?paymentId=${encodeURIComponent(payment.id)}&refresh=1`,
+        { cache: "no-store" }
+      );
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "The payment status could not be checked.");
+      const next = result.payment as SubscriptionPayment;
+      setPayment(next);
+      if (next.status === "VERIFIED") {
+        setMessage("Payment received. Your subscription is active.");
+        await load();
+        if (!autoOpenedForm.current) {
+          autoOpenedForm.current = true;
+          openCreateForm();
+        }
+      } else if (next.status === "REJECTED") {
+        setError(next.failureReason || "The payment was not completed. Try again.");
+      } else {
+        setMessage("Still waiting for SonicPesa. Approve the prompt on your phone.");
+      }
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "The payment status could not be checked.");
+    } finally {
+      setCheckingPayment(false);
     }
   }
 
@@ -651,7 +738,7 @@ export function DalaliDashboard({
         <button
           className="wide-button"
           type="button"
-          disabled={busy}
+          disabled={busy || paying}
           onClick={() => {
             if (!active) {
               void startCheckout();
@@ -683,13 +770,47 @@ export function DalaliDashboard({
           {AGENT_PLAN.maxListings} listings · {AGENT_PLAN.maxPhotosPerListing} photos per listing · {agentPlanDuration}.
         </p>
         <p>Payments are for Agents only. Tenants do not pay rent, deposits, or fees inside DarRoom.</p>
-        <button className="wide-button" onClick={startCheckout} disabled={busy}>
-          {busy ? "Starting..." : `Pay TSh ${agentPlanPrice}`}
+        <button className="wide-button" onClick={startCheckout} disabled={paying}>
+          {paying ? "Sending prompt..." : `Pay TSh ${agentPlanPrice}`}
         </button>
-        {mockPayments && (
-          <p className="fine-print">
-            Test payments are enabled (PAYMENTS_MOCK). No real payments will be taken.
-          </p>
+        <p className="fine-print">
+          Pay with M-Pesa, Tigo Pesa, Airtel Money or Halopesa. SonicPesa sends a prompt to{" "}
+          {user.phone}; approve it with your mobile-money PIN. DarRoom never asks for your PIN.
+        </p>
+        {payment && (
+          <div className="status-row">
+            <div>
+              <span
+                className={`status ${
+                  payment.status === "VERIFIED"
+                    ? "live"
+                    : payment.status === "PENDING"
+                      ? "pending"
+                      : "flagged"
+                }`}
+              >
+                {payment.status === "VERIFIED"
+                  ? "Paid"
+                  : payment.status === "PENDING"
+                    ? "Waiting for your approval"
+                    : "Not completed"}
+              </span>
+              <p className="fine-print">
+                TSh {payment.amountTzs.toLocaleString("en-TZ")} · reference{" "}
+                {payment.orderId || payment.id}
+              </p>
+            </div>
+            {payment.status === "PENDING" && (
+              <button
+                className="table-action"
+                type="button"
+                onClick={checkPaymentNow}
+                disabled={checkingPayment}
+              >
+                {checkingPayment ? "Checking..." : "Check status now"}
+              </button>
+            )}
+          </div>
         )}
         {!active && <div className="gate">Once your subscription expires, you cannot add listings, edit them, or upload photos. Published listings stay visible.</div>}
       </article>
@@ -756,8 +877,8 @@ export function DalaliDashboard({
               <strong>Pay TSh {agentPlanPrice} per month to upload photos and add listings.</strong>
               <p>Published listings stay visible, but uploading new photos and editing are only allowed with an active subscription.</p>
             </div>
-            <button className="table-action" type="button" onClick={startCheckout} disabled={busy}>
-              {busy ? "Starting..." : "Pay now"}
+            <button className="table-action" type="button" onClick={startCheckout} disabled={paying}>
+              {paying ? "Sending prompt..." : "Pay now"}
             </button>
           </div>
         )}
@@ -1025,7 +1146,7 @@ export function DalaliDashboard({
               <button
                 className="empty-reset"
                 type="button"
-                disabled={busy}
+                disabled={busy || paying}
                 onClick={() => {
                   if (!active) {
                     void startCheckout();
