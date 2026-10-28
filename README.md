@@ -262,3 +262,6 @@ credentials and use a managed PostgreSQL instance with backups.
 5. **Final gate** — confirm `PAYMENTS_MOCK` is unset/false, the local upload
    driver stays disabled (it checks `NODE_ENV`), seed passwords are replaced,
    and backups/point-in-time recovery are enabled on Supabase.
+6. **Automatic deploys** — run `vercel git connect` once so every push to
+   `main` builds and deploys to production. Run `vercel --prod` manually only
+   for the first deploy or when the Git connection is unavailable.
