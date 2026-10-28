@@ -4,7 +4,14 @@ import { readJsonBody } from "./http";
 import { formatTanzaniaPhone, maskPhone, normalizeTanzaniaPhone } from "./phone";
 import { isSafeStorageKey } from "./storage";
 import { LISTING_DURATION_DAYS, listingExpiryFrom, notExpiredFilter } from "./listing-policy";
-import { SUBSCRIPTION_PLANS, canUserAddListing, hasFeaturedSlots, photoLimitForPlan } from "./subscriptions-plans";
+import {
+  AGENT_PLAN,
+  AGENT_PLAN_ID,
+  SUBSCRIPTION_PLANS,
+  canUserAddListing,
+  hasFeaturedSlots,
+  photoLimitForPlan
+} from "./subscriptions-plans";
 
 const MB = 1024 * 1024;
 
@@ -86,14 +93,20 @@ describe("phone privacy", () => {
 });
 
 describe("plan rules", () => {
-  it("keeps the published prices and durations stable", () => {
-    expect(SUBSCRIPTION_PLANS.BASIC.priceTzs).toBe(5000);
-    expect(SUBSCRIPTION_PLANS.PREMIUM.priceTzs).toBe(15000);
-    expect(SUBSCRIPTION_PLANS.FEATURED.priceTzs).toBe(30000);
-    expect(SUBSCRIPTION_PLANS.BASIC.durationDays).toBe(30);
+  it("sells exactly one agent plan for TSh 5,000", () => {
+    expect(AGENT_PLAN_ID).toBe("BASIC");
+    expect(AGENT_PLAN).toBe(SUBSCRIPTION_PLANS.BASIC);
+    expect(AGENT_PLAN.priceTzs).toBe(5000);
+    expect(AGENT_PLAN.durationDays).toBe(30);
+    expect(AGENT_PLAN.featuredSlots).toBe(0);
   });
 
-  it("gives featured slots only to the paid plans", () => {
+  it("keeps the legacy plan definitions for existing subscriptions", () => {
+    expect(SUBSCRIPTION_PLANS.PREMIUM.priceTzs).toBe(15000);
+    expect(SUBSCRIPTION_PLANS.FEATURED.priceTzs).toBe(30000);
+  });
+
+  it("gives featured slots only to the legacy paid plans", () => {
     expect(hasFeaturedSlots(0, "BASIC")).toBe(false);
     expect(hasFeaturedSlots(0, "PREMIUM")).toBe(true);
     expect(hasFeaturedSlots(2, "PREMIUM")).toBe(false);
@@ -102,14 +115,14 @@ describe("plan rules", () => {
   });
 
   it("enforces the listing limit of each plan", () => {
-    expect(canUserAddListing(4, "BASIC")).toBe(true);
-    expect(canUserAddListing(5, "BASIC")).toBe(false);
+    expect(canUserAddListing(9, "BASIC")).toBe(true);
+    expect(canUserAddListing(10, "BASIC")).toBe(false);
     expect(canUserAddListing(20, "PREMIUM")).toBe(false);
     expect(canUserAddListing(0, "NOT_A_PLAN")).toBe(false);
   });
 
   it("enforces the photo limit of each plan", () => {
-    expect(photoLimitForPlan("BASIC")).toBe(5);
+    expect(photoLimitForPlan("BASIC")).toBe(10);
     expect(photoLimitForPlan("PREMIUM")).toBe(10);
     expect(photoLimitForPlan("FEATURED")).toBe(10);
     expect(photoLimitForPlan("NOT_A_PLAN")).toBe(10);

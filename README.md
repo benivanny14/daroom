@@ -110,9 +110,9 @@ No code change is needed.
 - `/account` shows the login/registration flow to guests. Signed-in users get a
   dashboard with profile editing, password change, device-wide logout,
   account favorites, and their viewing appointments.
-- `/dalali` is the agent dashboard: subscription status and checkout, listing
-  create/edit/hide/restore, multi-photo upload (Basic 5, Premium/Featured 10,
-  hard ceiling 10; 15 MB per photo), analytics,
+- `/dalali` is the agent dashboard: one subscription at TSh 5,000 / 30 days
+  (no plan picker), listing create/edit/hide/restore, multi-photo upload (10
+  photos per listing, hard ceiling 10; 15 MB per photo), analytics,
   availability toggle, expiry and 60-day renewal, viewing management (bookings
   are confirmed immediately, with no agent approval step), and ID verification
   submission.

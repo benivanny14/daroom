@@ -5,7 +5,7 @@ import { normalizeTanzaniaPhone } from "@/lib/phone";
 import { prisma } from "@/lib/prisma";
 import { createSelcomCheckout } from "@/lib/selcom";
 import { readJsonBody } from "@/lib/http";
-import { getPlanById } from "@/lib/subscriptions-plans";
+import { AGENT_PLAN, AGENT_PLAN_ID } from "@/lib/subscriptions-plans";
 import { mockPaymentsEnabled } from "@/lib/payments";
 import { clientIp, enforceRateLimit } from "@/lib/rate-limit";
 import { z } from "zod";
@@ -29,14 +29,13 @@ export async function POST(request: NextRequest) {
     const rawBody = await readJsonBody(request, 2 * 1024);
     if (!rawBody.ok) return NextResponse.json({ error: "Invalid or oversized request data." }, { status: rawBody.status });
     const body = z.object({
-      phone: z.string().min(9).max(24),
-      plan: z.enum(["BASIC", "PREMIUM", "FEATURED"]).optional().default("BASIC")
+      phone: z.string().min(9).max(24)
     }).safeParse(rawBody.value);
     const phone = body.success ? normalizeTanzaniaPhone(body.data.phone) : null;
     if (!phone || !body.success) return NextResponse.json({ error: "Enter a valid Tanzanian phone number for payment." }, { status: 400 });
 
-    const planConfig = getPlanById(body.data.plan);
-    const amountTzs = planConfig ? planConfig.priceTzs : 5_000;
+    // Agents have exactly one plan. Any plan sent by a client is ignored.
+    const amountTzs = AGENT_PLAN.priceTzs;
     const reference = `${user.id}-${randomUUID().replace(/-/g, "").slice(0, 16)}`;
     const baseUrl = process.env.APP_URL || "http://localhost:3000";
     const payment = await prisma.paymentEvent.create({
@@ -45,7 +44,7 @@ export async function POST(request: NextRequest) {
         provider: "SELCOM",
         reference,
         amountTzs,
-        plan: body.data.plan,
+        plan: AGENT_PLAN_ID,
         status: "PENDING"
       }
     });

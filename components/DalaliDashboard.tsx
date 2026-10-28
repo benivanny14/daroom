@@ -2,7 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
-import { SUBSCRIPTION_PLANS, photoLimitForPlan } from "@/lib/subscriptions-plans";
+import { AGENT_PLAN, AGENT_PLAN_ID, SUBSCRIPTION_PLANS, photoLimitForPlan } from "@/lib/subscriptions-plans";
 
 type District = { id: string; name: string; neighborhoods: { id: string; name: string }[] };
 type Photo = { id: string; url?: string | null; altText: string };
@@ -155,12 +155,7 @@ export function DalaliDashboard({
   const [editingId, setEditingId] = useState("");
   const [creating, setCreating] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [selectedPlan, setSelectedPlan] = useState("BASIC");
 
-  // Preselect the plan the agent is already on when it loads.
-  useEffect(() => {
-    if (subscription?.plan) setSelectedPlan(subscription.plan);
-  }, [subscription?.plan]);
   const [photoBusyId, setPhotoBusyId] = useState("");
   const [filter, setFilter] = useState<ListingFilter>("all");
   const [message, setMessage] = useState("");
@@ -275,18 +270,11 @@ export function DalaliDashboard({
     formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [creating]);
 
-  const planPrices: Record<string, { price: string; duration: string }> = {
-    BASIC: { price: "TSh 5,000", duration: "30 days" },
-    PREMIUM: { price: "TSh 15,000", duration: "30 days" },
-    FEATURED: { price: "TSh 30,000", duration: "30 days" }
-  };
-
-  const currentPlan = subscription?.plan || "BASIC";
+  const currentPlan = subscription?.plan || AGENT_PLAN_ID;
   const photoLimit = photoLimitForPlan(currentPlan);
-  const { price, duration } = planPrices[currentPlan] || planPrices.BASIC;
-  const selectedPlanConfig = SUBSCRIPTION_PLANS[selectedPlan] || SUBSCRIPTION_PLANS.BASIC;
-  const selectedPlanPrice = selectedPlanConfig.priceTzs.toLocaleString("en-TZ");
-  const featuredSlots = (SUBSCRIPTION_PLANS[currentPlan] || SUBSCRIPTION_PLANS.BASIC).featuredSlots;
+  const agentPlanPrice = AGENT_PLAN.priceTzs.toLocaleString("en-TZ");
+  const agentPlanDuration = `${AGENT_PLAN.durationDays} days`;
+  const featuredSlots = (SUBSCRIPTION_PLANS[currentPlan] || AGENT_PLAN).featuredSlots;
 
   async function saveListing(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -354,7 +342,7 @@ export function DalaliDashboard({
       const response = await fetch("/api/payments/selcom/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone: user.phone, plan: selectedPlan })
+        body: JSON.stringify({ phone: user.phone })
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Payment could not be started.");
@@ -677,47 +665,26 @@ export function DalaliDashboard({
             openCreateForm();
           }}
         >
-          {!active ? `Pay TSh ${selectedPlanPrice} to post` : creating ? "Close form" : "+ Post a room"}
+          {!active ? `Pay TSh ${agentPlanPrice} to post` : creating ? "Close form" : "+ Post a room"}
         </button>
       </article>
 
       <article className="panel subscription-panel">
         <span className="eyebrow">Listing subscription</span>
-        <div className="plan-price">{price} <small>/ {duration}</small></div>
-        <p>Plan: <strong>{currentPlan}</strong></p>
+        <div className="plan-price">TSh {agentPlanPrice} <small>/ {agentPlanDuration}</small></div>
+        <p>One plan for all agents. No tiers, no extra charges.</p>
         {subscription ? (
           <p>
             Status: <strong>{active ? "Active" : "Expired"}</strong>
             {" · "}Ends: {new Date(subscription.endsAt).toLocaleDateString("en-GB")}
           </p>
         ) : <p>You have no current subscription.</p>}
-        <fieldset className="plan-picker">
-          <legend>Choose your plan</legend>
-          {(Object.keys(SUBSCRIPTION_PLANS)).map((planId) => {
-            const plan = SUBSCRIPTION_PLANS[planId];
-            const selected = selectedPlan === plan.id;
-            return (
-              <label key={plan.id} className={`plan-option${selected ? " selected" : ""}`}>
-                <input
-                  type="radio"
-                  name="subscription-plan"
-                  value={plan.id}
-                  checked={selected}
-                  onChange={() => setSelectedPlan(plan.id)}
-                />
-                <span className="plan-option-name">{plan.name}</span>
-                <span className="plan-option-price">TSh {plan.priceTzs.toLocaleString("en-TZ")}</span>
-                <small>
-                  {plan.maxListings} listings · {plan.maxPhotosPerListing} photos/ listing
-                  {plan.featuredSlots > 0 ? ` · ${plan.featuredSlots} featured slot${plan.featuredSlots === 1 ? "" : "s"}` : " · no featured slots"}
-                </small>
-              </label>
-            );
-          })}
-        </fieldset>
+        <p>
+          {AGENT_PLAN.maxListings} listings · {AGENT_PLAN.maxPhotosPerListing} photos per listing · {agentPlanDuration}.
+        </p>
         <p>Payments are for Agents only. Tenants do not pay rent, deposits, or fees inside DarRoom.</p>
         <button className="wide-button" onClick={startCheckout} disabled={busy}>
-          {busy ? "Starting..." : `Pay TSh ${selectedPlanPrice} for ${selectedPlanConfig.name}`}
+          {busy ? "Starting..." : `Pay TSh ${agentPlanPrice}`}
         </button>
         {mockPayments && (
           <p className="fine-print">
@@ -786,7 +753,7 @@ export function DalaliDashboard({
         {!active && (
           <div className="subscription-lock">
             <div>
-              <strong>Pay TSh {selectedPlanPrice} per month to upload photos and add listings.</strong>
+              <strong>Pay TSh {agentPlanPrice} per month to upload photos and add listings.</strong>
               <p>Published listings stay visible, but uploading new photos and editing are only allowed with an active subscription.</p>
             </div>
             <button className="table-action" type="button" onClick={startCheckout} disabled={busy}>
@@ -1067,7 +1034,7 @@ export function DalaliDashboard({
                   openCreateForm();
                 }}
               >
-                {active ? "+ Post your first room" : `Pay TSh ${selectedPlanPrice} to start posting`}
+                {active ? "+ Post your first room" : `Pay TSh ${agentPlanPrice} to start posting`}
               </button>
             </div>
           )}
