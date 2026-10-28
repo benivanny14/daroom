@@ -16,7 +16,11 @@ const REJECTED_BODY = JSON.stringify({ error: "This request was rejected." });
  * a provider signature instead of a browser Origin, so the site check does not
  * apply to them.
  */
-const SERVER_TO_SERVER = [/^\/api\/cron\//, /^\/api\/payments\/[^/]+\/callback$/];
+const SERVER_TO_SERVER = [
+  /^\/api\/cron\//,
+  /^\/api\/payments\/[^/]+\/callback$/,
+  /^\/api\/payments\/webhook$/
+];
 
 function reject(): NextResponse {
   return new NextResponse(REJECTED_BODY, {

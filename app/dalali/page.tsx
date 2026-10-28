@@ -41,7 +41,7 @@ export default async function DalaliPage({
         <section className="page-hero">
           <span className="eyebrow">Agent dashboard</span>
           <h1>Hello, {user.name}.</h1>
-          <p>Tenants contact you directly. DarRoom does not collect rent or deposits from tenants.</p>
+          <p>Tenants contact you directly. Rent can optionally be paid through DarRoom&apos;s mobile-money page when you ask the tenant to use it.</p>
         </section>
         {paymentNotice && <p className={paymentNotice.tone} role="status">{paymentNotice.text}</p>}
         <DalaliDashboard user={{ id: user.id, name: user.name, email: user.email, phone: user.phone }} mockPayments={mockPaymentsEnabled()} payment={payment} />

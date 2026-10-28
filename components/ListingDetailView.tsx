@@ -360,7 +360,7 @@ export function ListingDetailView({ listingId }: { listingId: string }) {
           <button className="report-button detail-report" onClick={() => setReportOpen(true)}>
             Report this room
           </button>
-          <p className="fine-print">DarRoom does not collect rent, deposits or viewing fees.</p>
+          <p className="fine-print">DarRoom does not charge tenants a platform fee. Rent payments are optional and only collected when your agent asks you to use the Pay rent page.</p>
         </article>
       </div>
 

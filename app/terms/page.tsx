@@ -18,7 +18,7 @@ export default function TermsPage() {
 
           <section style={{ marginTop: "30px" }}>
             <h2>1. How DarRoom Works</h2>
-            <p>DarRoom is a platform that connects tenants with Agents for rental rooms in Dar es Salaam. DarRoom does not collect rent, deposits, or any fee from tenants. All payments are made directly between the tenant and the Agent.</p>
+            <p>DarRoom is a platform that connects tenants with Agents for rental rooms in Dar es Salaam. Searching and viewing are free. Rent can optionally be paid through DarRoom using SonicPesa, and DarRoom never asks for a tenant&apos;s mobile-money PIN. All other payments are made directly between the tenant and the Agent.</p>
           </section>
 
           <section style={{ marginTop: "30px" }}>

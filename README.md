@@ -2,8 +2,9 @@
 
 Mobile-first Dar es Salaam rental-discovery app built with Next.js App Router,
 TypeScript, Prisma, and PostgreSQL. The tenant journey is public and free;
-tenants contact the advertiser directly. DarRoom does **not** collect rent,
-deposits, viewing fees, or any tenant payment.
+tenants contact the advertiser directly. Rent can optionally be paid through
+DarRoom's SonicPesa mobile-money page when an agent asks the tenant to use it.
+DarRoom never asks for a tenant's mobile-money PIN.
 
 ## Run locally (Windows)
 
@@ -65,7 +66,13 @@ full flow working without credentials:
   `NODE_ENV` is not `production`, checkout returns
   `/api/payments/mock/checkout`, which marks the pending payment as verified
   and activates a subscription for the signed-in agent. Real Selcom
-  credentials are still required in production.
+  credentials are still required for agent subscriptions.
+- **SonicPesa rent payments** (`lib/sonicpesa.ts`): tenants can pay rent with
+  M-Pesa, Tigo Pesa, Airtel Money, or Halopesa from `/rent`. The checkout route
+  creates a `RentPayment` row, sends the USSD push, and the signed webhook at
+  `/api/payments/webhook` moves the row to `PAID`, `FAILED`, or `CANCELLED`.
+  Set `SONICPESA_ACCESS_KEY`, `SONICPESA_SECRET_KEY`, and optionally
+  `SONICPESA_BASE_URL`; register the webhook URL in the SonicPesa dashboard.
 
 Email is also optional. When `RESEND_API_KEY` and `EMAIL_FROM` are missing,
 `emailConfigured()` is false and the auth flow adapts instead of creating
@@ -230,11 +237,16 @@ scripts/
 ## Production notes
 
 Do not enable `PAYMENTS_MOCK` or the local media driver in production. Configure
-`S3_*` and `MEDIA_PUBLIC_BASE_URL`, `SELCOM_*`, `RESEND_API_KEY`/`EMAIL_FROM`,
-`CRON_SECRET` instead. Payment callbacks are
+`S3_*` and `MEDIA_PUBLIC_BASE_URL`, `SELCOM_*`, `SONICPESA_*`,
+`RESEND_API_KEY`/`EMAIL_FROM`, `CRON_SECRET` instead. Payment callbacks are
 signature-verified server-to-server before entitlement changes; never treat a
 browser redirect or callback parameter as proof of payment. Replace all seed
 credentials and use a managed PostgreSQL instance with backups.
+
+For SonicPesa, set the webhook URL in the SonicPesa dashboard to
+`https://<your-domain>/api/payments/webhook`. The handler verifies the
+`X-SonicPesa-Signature` HMAC (SHA-256 of the raw body using
+`SONICPESA_SECRET_KEY`) before changing any `RentPayment` row.
 
 ### Deploying to Vercel + Supabase
 

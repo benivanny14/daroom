@@ -35,6 +35,13 @@ enum PaymentStatus {
   REJECTED
 }
 
+enum RentPaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  CANCELLED
+}
+
 enum SubscriptionStatus {
   ACTIVE
   EXPIRED
@@ -79,6 +86,7 @@ model User {
   reportsMade     Report[]         @relation("Reporter")
   appointments    ViewingAppointment[]
   idVerification  IdVerification[]
+  rentPayments    RentPayment[]
 }
 
 model Region {
@@ -147,6 +155,7 @@ model Listing {
   reviews        Review[]
   appointments   ViewingAppointment[]
   analytics      ListingAnalytics?
+  rentPayments   RentPayment[]
 
   @@index([status, districtId, neighborhoodId, priceTzs])
   @@index([ownerId, status])
@@ -251,6 +260,35 @@ model PaymentEvent {
 
   @@index([userId, receivedAt])
   @@index([status, receivedAt])
+}
+
+/// A mobile-money rent payment collected through SonicPesa. `rentReference`
+/// stores the rent/tenancy reference supplied by the caller; `listingId` links
+/// the payment to a room when the tenant chooses one.
+model RentPayment {
+  id                String            @id @default(cuid())
+  tenantId          String
+  listingId         String?
+  rentReference     String?
+  amountTzs         Int
+  phone             String
+  provider          String            @default("SONICPESA")
+  providerOrderId   String?           @unique
+  providerTransId   String?           @unique
+  providerReference String?
+  channel           String?
+  status            RentPaymentStatus @default(PENDING)
+  failureReason     String?
+  rawPayload        Json?
+  paidAt            DateTime?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  tenant            User              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  listing           Listing?          @relation(fields: [listingId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, createdAt])
+  @@index([status, createdAt])
+  @@index([listingId])
 }
 
 model SiteSetting {

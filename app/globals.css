@@ -312,7 +312,7 @@ img { max-width: 100%; }
 .panel-heading .table-action, .my-listing-actions button { flex: none; }
 .listing-form { display: grid; gap: 8px; padding: 18px 0; border-bottom: 1px solid var(--line); }
 .listing-form label, .account-form label { margin-top: 7px; font-size: 13px; font-weight: 750; }
-.account-form input, .listing-form input, .listing-form select, .listing-form textarea {
+.account-form input, .account-form select, .listing-form input, .listing-form select, .listing-form textarea {
   width: 100%; min-height: 46px; padding: 10px 12px; border: 1px solid var(--line);
   border-radius: 0; background: var(--field); color: var(--ink); font-size: 14px;
 }

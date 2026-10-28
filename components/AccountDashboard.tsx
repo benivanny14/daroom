@@ -217,6 +217,7 @@ export function AccountDashboard({ user: initialUser }: { user: SessionUser }) {
         </div>
         <div className="account-hero-actions">
           {user.role === "DALALI" && <Link className="table-action" href="/dalali">Agent Dashboard</Link>}
+          {user.role === "TENANT" && <Link className="table-action" href="/rent">Pay rent</Link>}
           <button className="table-action destructive" type="button" disabled={loggingOut} onClick={logoutEverywhere}>
             {loggingOut ? "Logging out..." : "Log out of all devices"}
           </button>
@@ -350,6 +351,22 @@ export function AccountDashboard({ user: initialUser }: { user: SessionUser }) {
             <p className="empty">You have no viewings yet. Open a listing and click &ldquo;Schedule a viewing&rdquo;.</p>
           )}
         </article>
+
+        {user.role === "TENANT" && (
+          <article className="panel wide">
+            <div className="panel-heading">
+              <div>
+                <span className="eyebrow">Rent</span>
+                <h2>Pay rent with mobile money</h2>
+              </div>
+              <Link className="table-action" href="/rent">Pay rent</Link>
+            </div>
+            <p>
+              Pay your agent through M-Pesa, Tigo Pesa, Airtel Money or Halopesa. SonicPesa sends the
+              prompt to your phone and you approve it with your own PIN. DarRoom never asks for your PIN.
+            </p>
+          </article>
+        )}
       </div>
     </section>
   );
