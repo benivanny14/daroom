@@ -73,7 +73,10 @@ async function supabaseObjectInfo(key: string): Promise<{ size: number; contentT
 
 async function deleteSupabaseObject(key: string): Promise<void> {
   const response = await fetch(supabaseObjectUrl(key), { method: "DELETE", headers: supabaseHeaders() });
-  if (!response.ok && response.status !== 404) throw new Error("Could not delete the media object.");
+  // Supabase answers 400 with a "not_found" body when the object is already gone.
+  if (!response.ok && response.status !== 400 && response.status !== 404) {
+    throw new Error("Could not delete the media object.");
+  }
 }
 
 /**

@@ -227,18 +227,24 @@ credentials and use a managed PostgreSQL instance with backups.
    `postgresql://postgres:<password>@aws-0-<region>.pooler.supabase.com:5432/postgres`.
    Supabase signs pooler certificates with its own root CA, so `lib/prisma.ts`
    and `prisma/seed.cjs` pin that CA explicitly while keeping full certificate
-   verification enabled (no `rejectUnauthorized: false` anywhere).
+   verification enabled (no `rejectUnauthorized: false` anywhere). Because the
+   session pooler allows only ~15 clients in total, set `DATABASE_POOL_URL` to
+   the same URL on **port 6543** (transaction pooler) for the running app;
+   migrations keep using `DATABASE_URL` on 5432.
 2. **Migrations run on every deploy** — `vercel.json` sets
    `buildCommand` to `prisma generate && prisma migrate deploy && next build`,
    so a new commit applies pending migrations before the app builds. Seeds are
    NOT run on deploy; run `npm run db:seed` once against the production URL
    (it is idempotent).
 3. **Environment variables** — set every key from `.env.example` in the Vercel
-   project (Production/Preview): `DATABASE_URL`, `APP_URL` (the real https
-   domain), `AUTH_SECRET` (≥ 32 random chars), `ADMIN_*`, `CRON_SECRET`,
-   `RESEND_API_KEY`/`EMAIL_FROM`, `S3_*`/`MEDIA_PUBLIC_BASE_URL`, `SELCOM_*`,
-   plus the `NEXT_PUBLIC_SUPABASE_*` / `SUPABASE_SECRET_KEY` coordinates.
-   Never commit `.env` (it is gitignored).
+   project (Production/Preview): `DATABASE_URL`, `DATABASE_POOL_URL` (port
+   6543), `APP_URL` (the real https domain), `AUTH_SECRET` (≥ 32 random chars),
+   `ADMIN_*`, `CRON_SECRET`, `RESEND_API_KEY`/`EMAIL_FROM`, `SELCOM_*`, plus the
+   `NEXT_PUBLIC_SUPABASE_*` / `SUPABASE_SECRET_KEY` coordinates. Listing photos
+   use Supabase Storage (`SUPABASE_STORAGE_BUCKET`, default `darroom`) whenever
+   `NEXT_PUBLIC_SUPABASE_URL` and `SUPABASE_SECRET_KEY` are present; `S3_*` is
+   only needed if you prefer an S3-compatible bucket instead. Never commit
+   `.env` (it is gitignored).
 4. **Cron** — the `crons` block in `vercel.json` calls both endpoints daily
    (05:00 and 06:00 UTC; the Hobby plan allows one run per day per cron);
    `CRON_SECRET` must be set in Vercel or they return `401`.
