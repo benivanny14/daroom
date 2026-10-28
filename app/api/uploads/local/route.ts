@@ -37,7 +37,7 @@ export async function PUT(request: NextRequest) {
 
   const bytes = new Uint8Array(await request.arrayBuffer());
   if (bytes.byteLength === 0 || bytes.byteLength > MAX_MEDIA_BYTES) {
-    return NextResponse.json({ error: "Image must not exceed 15 MB." }, { status: 400 });
+    return NextResponse.json({ error: "Image must not exceed 5 MB." }, { status: 400 });
   }
   if (!matchesImageSignature(contentType, bytes)) {
     return NextResponse.json({ error: "File is not a valid image." }, { status: 400 });

@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 export default async function AccountPage({
   searchParams
 }: {
-  searchParams: Promise<{ verified?: string; reset?: string }>;
+  searchParams: Promise<{ verified?: string; reset?: string; next?: string }>;
 }) {
   const params = await searchParams;
   const user = await getSessionUser();
@@ -28,7 +28,7 @@ export default async function AccountPage({
         {user ? (
           <AccountDashboard user={user} />
         ) : (
-          <AccountForm verified={params.verified} resetToken={params.reset} />
+          <AccountForm verified={params.verified} resetToken={params.reset} next={params.next} />
         )}
       </main>
       <footer className="site-footer">

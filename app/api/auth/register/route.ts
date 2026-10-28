@@ -47,9 +47,30 @@ export async function POST(request: NextRequest) {
     });
     if (blacklisted) return NextResponse.json({ error: "Registration cannot be completed with these details." }, { status: 400 });
 
+    const passwordHash = await bcrypt.hash(body.data.password, 12);
+
+    // Without an email provider there is no way to verify ownership of the
+    // address. Rather than creating an account that can never be used, the
+    // address is accepted as-is and the account is usable immediately.
+    if (!emailConfigured()) {
+      await prisma.user.create({
+        data: {
+          name: body.data.name,
+          email,
+          phone,
+          passwordHash,
+          role: body.data.role,
+          isEmailVerified: true
+        }
+      });
+      return NextResponse.json({
+        ok: true,
+        message: "Account created. You can log in now."
+      }, { status: 201 });
+    }
+
     const plainToken = randomBytes(32).toString("base64url");
     const tokenHash = createHash("sha256").update(plainToken).digest("hex");
-    const passwordHash = await bcrypt.hash(body.data.password, 12);
     const user = await prisma.$transaction(async (tx) => {
       const created = await tx.user.create({
         data: {
@@ -82,17 +103,19 @@ export async function POST(request: NextRequest) {
       });
     } catch (error) {
       console.error("Account verification email failed", error);
+      // Do not leave an unusable account behind: the address must stay free
+      // so the person can try again once email delivery works.
+      await prisma.user.delete({ where: { id: user.id } }).catch((cleanupError) => {
+        console.error("Could not roll back unverified account", cleanupError);
+      });
       return NextResponse.json({
-        error: "Account created but the email could not be sent. Contact support to resend the link."
+        error: "We could not send the verification email. Please try again in a few minutes."
       }, { status: 503 });
     }
 
     return NextResponse.json({
       ok: true,
-      message: "Check your email to verify your account before logging in.",
-      // Local development has no email provider; expose the link so the
-      // developer can finish registration without reading the server console.
-      devVerifyUrl: process.env.NODE_ENV === "production" || emailConfigured() ? undefined : verifyUrl
+      message: "Check your email to verify your account before logging in."
     }, { status: 201 });
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {

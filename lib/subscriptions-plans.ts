@@ -39,7 +39,7 @@ export const SUBSCRIPTION_PLANS: Record<string, SubscriptionPlanConfig> = {
     priceTzs: 30000,
     durationDays: 30,
     maxListings: 50,
-    maxPhotosPerListing: 15,
+    maxPhotosPerListing: 10,
     featuredSlots: 5,
     prioritySupport: true,
     analytics: true
@@ -48,6 +48,18 @@ export const SUBSCRIPTION_PLANS: Record<string, SubscriptionPlanConfig> = {
 
 export function getPlanById(planId: string): SubscriptionPlanConfig | undefined {
   return SUBSCRIPTION_PLANS[planId];
+}
+
+/** Hard ceiling for photos on any listing, regardless of plan. */
+export const MAX_PHOTOS_PER_LISTING = 10;
+
+/**
+ * The effective photo limit for a plan. Plans may offer fewer photos, but the
+ * global ceiling always applies.
+ */
+export function photoLimitForPlan(planId?: string | null): number {
+  const plan = planId ? getPlanById(planId) : undefined;
+  return Math.min(plan?.maxPhotosPerListing ?? MAX_PHOTOS_PER_LISTING, MAX_PHOTOS_PER_LISTING);
 }
 
 export function calculateSubscriptionEnd(planId: string): Date {

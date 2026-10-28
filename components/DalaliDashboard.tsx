@@ -2,7 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
-import { SUBSCRIPTION_PLANS } from "@/lib/subscriptions-plans";
+import { SUBSCRIPTION_PLANS, photoLimitForPlan } from "@/lib/subscriptions-plans";
 
 type District = { id: string; name: string; neighborhoods: { id: string; name: string }[] };
 type Photo = { id: string; url?: string | null; altText: string };
@@ -69,7 +69,6 @@ type FormValues = {
   allowsStudents: boolean;
 };
 
-const MAX_PHOTOS_PER_LISTING = 10;
 const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
 const MAX_PHOTO_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
 
@@ -240,8 +239,8 @@ export function DalaliDashboard({
         problems.push(`${file.name}: must not exceed 5 MB.`);
         continue;
       }
-      if (existingCount + formPhotos.length + accepted.length >= MAX_PHOTOS_PER_LISTING) {
-        problems.push(`${file.name}: skipped, a listing can have at most ${MAX_PHOTOS_PER_LISTING} photos.`);
+      if (existingCount + formPhotos.length + accepted.length >= photoLimit) {
+        problems.push(`${file.name}: skipped, a listing can have at most ${photoLimit} photos.`);
         continue;
       }
       accepted.push({ file, url: URL.createObjectURL(file) });
@@ -283,6 +282,7 @@ export function DalaliDashboard({
   };
 
   const currentPlan = subscription?.plan || "BASIC";
+  const photoLimit = photoLimitForPlan(currentPlan);
   const { price, duration } = planPrices[currentPlan] || planPrices.BASIC;
   const selectedPlanConfig = SUBSCRIPTION_PLANS[selectedPlan] || SUBSCRIPTION_PLANS.BASIC;
   const selectedPlanPrice = selectedPlanConfig.priceTzs.toLocaleString("en-TZ");
@@ -513,10 +513,10 @@ export function DalaliDashboard({
 
   async function uploadPhotos(listingId: string, files: File[], existingCount: number) {
     if (!files.length) return;
-    const remaining = Math.max(0, MAX_PHOTOS_PER_LISTING - existingCount);
+    const remaining = Math.max(0, photoLimit - existingCount);
     if (remaining === 0) {
       setMessage("");
-      setError(`This listing already has the maximum of ${MAX_PHOTOS_PER_LISTING} photos.`);
+      setError(`This listing already has the maximum of ${photoLimit} photos.`);
       return;
     }
 
@@ -563,7 +563,7 @@ export function DalaliDashboard({
       const problems: string[] = [];
       if (skipped > 0) {
         problems.push(
-          `${skipped} photo${skipped === 1 ? " was" : "s were"} skipped because a listing can have at most ${MAX_PHOTOS_PER_LISTING} photos.`
+          `${skipped} photo${skipped === 1 ? " was" : "s were"} skipped because a listing can have at most ${photoLimit} photos.`
         );
       }
       if (failures.length > 0) {
@@ -873,7 +873,7 @@ export function DalaliDashboard({
             <fieldset className="form-photos">
               <legend>Photos</legend>
               <p className="fine-print">
-                Add up to {MAX_PHOTOS_PER_LISTING} photos, 5 MB each (JPEG, PNG or WebP). The first
+                Add up to {photoLimit} photos, 5 MB each (JPEG, PNG or WebP). The first
                 photo is the cover and tenants can browse the rest as a slideshow.
               </p>
 
@@ -929,7 +929,7 @@ export function DalaliDashboard({
                   type="file"
                   accept="image/jpeg,image/png,image/webp"
                   multiple
-                  disabled={!active || busy || (editingListing?.photos.length ?? 0) + formPhotos.length >= MAX_PHOTOS_PER_LISTING}
+                  disabled={!active || busy || (editingListing?.photos.length ?? 0) + formPhotos.length >= photoLimit}
                   onChange={(event) => {
                     const files = Array.from(event.target.files ?? []);
                     if (files.length) addFormPhotos(files, editingListing?.photos.length ?? 0);
@@ -938,7 +938,7 @@ export function DalaliDashboard({
                 />
               </label>
               <small>
-                {((editingListing?.photos.length ?? 0) + formPhotos.length)}/{MAX_PHOTOS_PER_LISTING} photos selected.
+                {((editingListing?.photos.length ?? 0) + formPhotos.length)}/{photoLimit} photos selected.
               </small>
             </fieldset>
 
@@ -969,7 +969,7 @@ export function DalaliDashboard({
                   ? `Listing expires: ${new Date(listing.expiresAt).toLocaleDateString("en-GB")}`
                   : "Listing expiry not set."}
                 {listing.status === "EXPIRED" ? " · Expired; extend it to make it visible again." : ""}
-                {` · Photos ${listing.photos.length}/${MAX_PHOTOS_PER_LISTING}`}
+                {` · Photos ${listing.photos.length}/${photoLimit}`}
               </p>
               <div className="photo-manager">
                 {listing.photos.length === 0 ? (
@@ -1002,7 +1002,7 @@ export function DalaliDashboard({
                 ))}
               </div>
               <p className="fine-print">
-                Select several photos at once. Up to {MAX_PHOTOS_PER_LISTING} photos per listing, 5 MB each
+                Select several photos at once. Up to {photoLimit} photos per listing, 5 MB each
                 (JPEG, PNG, or WebP). The first photo is used as the cover, and tenants can browse the rest as a slideshow.
               </p>
               <div className="listing-details">
@@ -1037,7 +1037,7 @@ export function DalaliDashboard({
                     type="file"
                     accept="image/jpeg,image/png,image/webp"
                     multiple
-                    disabled={!active || busy || listing.photos.length >= MAX_PHOTOS_PER_LISTING}
+                    disabled={!active || busy || listing.photos.length >= photoLimit}
                     onChange={(event) => {
                       const files = Array.from(event.target.files ?? []);
                       if (files.length) void uploadPhotos(listing.id, files, listing.photos.length);

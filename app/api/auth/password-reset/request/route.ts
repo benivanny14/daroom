@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { assertSameOrigin, authErrorResponse } from "@/lib/auth";
-import { sendActionLink } from "@/lib/email";
+import { emailConfigured, sendActionLink } from "@/lib/email";
 import { readJsonBody } from "@/lib/http";
 import { prisma } from "@/lib/prisma";
 import { clientIp, enforceRateLimit } from "@/lib/rate-limit";
@@ -25,6 +25,11 @@ export async function POST(request: NextRequest) {
   if (!rawBody.ok) return NextResponse.json({ error: "Invalid request or data too large." }, { status: rawBody.status });
   const body = z.object({ email: z.string().trim().email().max(254) }).safeParse(rawBody.value);
   if (!body.success) return NextResponse.json({ error: "Enter a valid email." }, { status: 400 });
+  if (!emailConfigured()) {
+    return NextResponse.json({
+      error: "Password reset by email is not available right now. Contact support for help."
+    }, { status: 503 });
+  }
 
   const user = await prisma.user.findUnique({ where: { email: body.data.email.toLowerCase() } });
   if (user?.isActive) {
@@ -38,12 +43,19 @@ export async function POST(request: NextRequest) {
         expiresAt: new Date(Date.now() + 60 * 60 * 1000)
       }
     });
-    await sendActionLink({
-      to: user.email,
-      name: user.name,
-      url: `${process.env.APP_URL || "http://localhost:3000"}/account?reset=${encodeURIComponent(plainToken)}`,
-      purpose: "reset"
-    });
+    try {
+      await sendActionLink({
+        to: user.email,
+        name: user.name,
+        url: `${process.env.APP_URL || "http://localhost:3000"}/account?reset=${encodeURIComponent(plainToken)}`,
+        purpose: "reset"
+      });
+    } catch (error) {
+      console.error("Password reset email failed", error);
+      return NextResponse.json({
+        error: "The reset email could not be sent. Please try again in a few minutes."
+      }, { status: 503 });
+    }
   }
   return NextResponse.json({ ok: true, message: "If this email is registered, you'll receive a password reset link." });
 }

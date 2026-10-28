@@ -6,13 +6,16 @@ type Mode = "login" | "register" | "forgot" | "reset" | "resend" | "twofactor";
 
 export function AccountForm({
   verified,
-  resetToken
+  resetToken,
+  next
 }: {
   verified?: string;
   resetToken?: string;
+  next?: string;
 }) {
   const [mode, setMode] = useState<Mode>(resetToken ? "reset" : verified === "invalid" ? "resend" : "login");
   const [email, setEmail] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [message, setMessage] = useState(
     verified === "success"
       ? "Email verified. You can now log in."
@@ -21,18 +24,25 @@ export function AccountForm({
         : ""
   );
   const [error, setError] = useState("");
-  const [devVerifyUrl, setDevVerifyUrl] = useState("");
   const [busy, setBusy] = useState(false);
+
+  const nextPath = next && next.startsWith("/") && !next.startsWith("//") ? next : "";
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
     setMessage("");
-    setDevVerifyUrl("");
     setBusy(true);
     const form = new FormData(event.currentTarget);
     const submittedEmail = String(form.get("email") || email).toLowerCase();
     setEmail(submittedEmail);
+    const password = String(form.get("password") || "");
+    const confirmPassword = String(form.get("confirmPassword") || "");
+    if ((mode === "register" || mode === "reset") && password !== confirmPassword) {
+      setBusy(false);
+      setError("The two passwords do not match.");
+      return;
+    }
     const endpoint = mode === "twofactor"
       ? "/api/auth/totp"
       : mode === "login"
@@ -47,10 +57,16 @@ export function AccountForm({
     const payload = mode === "twofactor"
       ? { code: form.get("code") }
       : mode === "reset"
-      ? { token: resetToken, password: form.get("password") }
-      : mode === "register"
-        ? Object.fromEntries(form.entries())
-        : Object.fromEntries(form.entries());
+        ? { token: resetToken, password }
+        : mode === "register"
+          ? {
+              name: form.get("name"),
+              email: form.get("email"),
+              phone: form.get("phone"),
+              role: form.get("role"),
+              password
+            }
+          : Object.fromEntries(form.entries());
 
     try {
       const response = await fetch(endpoint, {
@@ -67,15 +83,16 @@ export function AccountForm({
           return;
         }
         const role = result.user?.role;
-        window.location.assign(role === "ADMIN" ? "/admin" : role === "TENANT" ? "/account" : "/dalali");
+        window.location.assign(
+          nextPath || (role === "ADMIN" ? "/admin" : role === "TENANT" ? "/account" : "/dalali")
+        );
         return;
       }
       if (mode === "twofactor") {
-        window.location.assign("/admin");
+        window.location.assign(nextPath || "/admin");
         return;
       }
       setMessage(result.message);
-      setDevVerifyUrl(result.devVerifyUrl || "");
       if (mode === "reset") setMode("login");
       if (mode === "register") setMode("login");
     } catch (caught) {
@@ -110,12 +127,6 @@ export function AccountForm({
                 : "We will send instructions to your email."}
       </p>
       {message && <p className="notice" role="status">{message}</p>}
-      {devVerifyUrl && (
-        <p className="notice" role="status">
-          Test environment (no email provider):{" "}
-          <a href={devVerifyUrl}>click here to verify your account</a>
-        </p>
-      )}
       {error && <p className="admin-warning" role="alert">{error}</p>}
       <form className="account-form" onSubmit={submit}>
         {mode === "register" && (
@@ -140,15 +151,43 @@ export function AccountForm({
         {(mode === "login" || mode === "register" || mode === "reset") && (
           <>
             <label htmlFor="password">{mode === "reset" ? "New password" : "Password"}</label>
-            <input
-              id="password"
-              name="password"
-              type="password"
-              autoComplete={mode === "login" ? "current-password" : "new-password"}
-              minLength={mode === "login" ? undefined : 12}
-              required
-            />
-            {mode !== "login" && <small>Use at least 12 characters.</small>}
+            <div className="password-field">
+              <input
+                id="password"
+                name="password"
+                type={showPassword ? "text" : "password"}
+                autoComplete={mode === "login" ? "current-password" : "new-password"}
+                minLength={mode === "login" ? undefined : 12}
+                maxLength={128}
+                required
+              />
+              <button
+                type="button"
+                className="password-toggle"
+                aria-label={showPassword ? "Hide password" : "Show password"}
+                aria-pressed={showPassword}
+                onClick={() => setShowPassword((current) => !current)}
+              >
+                {showPassword ? "Hide" : "Show"}
+              </button>
+            </div>
+            {mode !== "login" && (
+              <>
+                <label htmlFor="confirm-password">Repeat password</label>
+                <div className="password-field">
+                  <input
+                    id="confirm-password"
+                    name="confirmPassword"
+                    type={showPassword ? "text" : "password"}
+                    autoComplete="new-password"
+                    minLength={12}
+                    maxLength={128}
+                    required
+                  />
+                </div>
+                <small>Use at least 12 characters.</small>
+              </>
+            )}
           </>
         )}
         {mode === "twofactor" && (

@@ -22,8 +22,12 @@ export async function POST(request: NextRequest) {
     if (!rawBody.ok) return NextResponse.json({ error: "Invalid request or data too large." }, { status: rawBody.status });
     const body = z.object({ email: z.string().trim().email().max(254) }).safeParse(rawBody.value);
     if (!body.success) return NextResponse.json({ error: "Enter a valid email." }, { status: 400 });
+    if (!emailConfigured()) {
+      return NextResponse.json({
+        error: "Email sending is not configured yet, so verification links cannot be sent. Contact support."
+      }, { status: 503 });
+    }
     const user = await prisma.user.findUnique({ where: { email: body.data.email.toLowerCase() } });
-    let devVerifyUrl: string | undefined;
 
     if (user && !user.isEmailVerified && user.isActive) {
       const plainToken = randomBytes(32).toString("base64url");
@@ -52,14 +56,15 @@ export async function POST(request: NextRequest) {
         });
       } catch (error) {
         console.error("Verification email resend failed", error);
+        return NextResponse.json({
+          error: "The verification email could not be sent. Please try again in a few minutes."
+        }, { status: 503 });
       }
-      if (process.env.NODE_ENV !== "production" && !emailConfigured()) devVerifyUrl = verifyUrl;
     }
 
     return NextResponse.json({
       ok: true,
-      message: "If your account needs verification, we've sent a new link to your email.",
-      devVerifyUrl
+      message: "If your account needs verification, we've sent a new link to your email."
     });
   } catch (error) {
     if (error instanceof AuthError) return NextResponse.json({ error: error.message }, { status: error.status });

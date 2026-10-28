@@ -1,6 +1,7 @@
 import bcrypt from "bcryptjs";
 import { NextRequest, NextResponse } from "next/server";
 import { assertSameOrigin, authErrorResponse, createSession, setSessionCookie, setTwoFactorCookie } from "@/lib/auth";
+import { emailConfigured } from "@/lib/email";
 import { readJsonBody } from "@/lib/http";
 import { prisma } from "@/lib/prisma";
 import { clientIp, enforceRateLimit } from "@/lib/rate-limit";
@@ -40,7 +41,7 @@ export async function POST(request: NextRequest) {
     if (!user || !user.isActive || !(await bcrypt.compare(body.data.password, user.passwordHash))) {
       return NextResponse.json({ error: "Incorrect email or password." }, { status: 401 });
     }
-    if (!user.isEmailVerified) {
+    if (!user.isEmailVerified && emailConfigured()) {
       return NextResponse.json({ error: "Verify your email before logging in." }, { status: 403 });
     }
 

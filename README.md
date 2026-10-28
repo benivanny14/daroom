@@ -33,9 +33,11 @@ The cluster data directory and log live under
   `npm run db:seed` to create the administrator
 
 The seed is idempotent. It creates geography, the administrator, payment
-methods, static pages, two sample listings, and a 30-day active subscription
-for the demo agent `juma@example.com` (password `StrongPassword123456`).
-Change every seed password before any public deployment.
+methods, and static pages. Sample agents and listings are opt-in: set
+`SEED_DEMO_DATA="true"` (local development only) to also create the demo agent
+`juma@example.com` (password `StrongPassword123456`), two sample listings, and
+a 30-day subscription. Leave it unset in production so the database stays
+clean. Change every seed password before any public deployment.
 
 Run checks with:
 
@@ -58,18 +60,26 @@ full flow working without credentials:
   `NODE_ENV` is not `production`, uploads are written to `public/uploads` and
   served as `/uploads/...`. The signed PUT endpoint
   `app/api/uploads/local/route.ts` validates the HMAC signature, content type,
-  magic bytes, and the 15 MB limit. This driver is disabled in production.
+  magic bytes, and the 5 MB limit. This driver is disabled in production.
 - **Payments** (`lib/payments.ts`): when `PAYMENTS_MOCK="true"` and
   `NODE_ENV` is not `production`, checkout returns
   `/api/payments/mock/checkout`, which marks the pending payment as verified
   and activates a subscription for the signed-in agent. Real Selcom
   credentials are still required in production.
 
-Email is also optional locally: without `RESEND_API_KEY` and `EMAIL_FROM`,
-verification and password-reset links are printed to the server console as
-`[email preview]` messages, and the registration/resend responses include a
-`devVerifyUrl` that `/account` shows as a clickable “click here to verify your
-account” link.
+Email is also optional. When `RESEND_API_KEY` and `EMAIL_FROM` are missing,
+`emailConfigured()` is false and the auth flow adapts instead of creating
+unusable accounts:
+
+- Registration creates the account already verified, so the person can log in
+  immediately.
+- Login does not block unverified accounts.
+- “Forgot password” and “resend verification” return a clear `503` explaining
+  that email delivery is not configured yet.
+
+Once Resend is configured, verification and password-reset emails are sent and
+the normal verification requirement returns automatically. No code change is
+needed.
 
 ### Phone privacy and reports
 
@@ -96,7 +106,8 @@ account” link.
   dashboard with profile editing, password change, device-wide logout,
   account favorites, and their viewing appointments.
 - `/dalali` is the agent dashboard: subscription status and checkout, listing
-  create/edit/hide/restore, multi-photo upload (up to 10 per listing), analytics,
+  create/edit/hide/restore, multi-photo upload (Basic 5, Premium/Featured 10,
+  hard ceiling 10; 5 MB per photo), analytics,
   availability toggle, expiry and 60-day renewal, viewing management (bookings
   are confirmed immediately, with no agent approval step), and ID verification
   submission.

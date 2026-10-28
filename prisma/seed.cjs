@@ -219,8 +219,10 @@ async function main() {
 
   console.info("Geography seeded, administrator account ensured, payment methods and static pages created.");
 
-  // Seed sample listings (if none exist)
-  const existingListings = await prisma.listing.count();
+  // Sample listings are opt-in (`SEED_DEMO_DATA=true`) so a production
+  // database stays clean after seeding.
+  const seedDemoData = process.env.SEED_DEMO_DATA === "true";
+  const existingListings = seedDemoData ? await prisma.listing.count() : 1;
   if (existingListings === 0) {
     const kinondoni = await prisma.district.findFirst({ where: { name: "Kinondoni" } });
     const sinza = await prisma.neighborhood.findFirst({ where: { name: "Sinza", districtId: kinondoni.id } });

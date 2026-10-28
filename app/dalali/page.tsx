@@ -13,7 +13,7 @@ export default async function DalaliPage({
   searchParams: Promise<{ payment?: string }>;
 }) {
   const user = await getSessionUser();
-  if (!user) redirect("/account?next=dalali");
+  if (!user) redirect("/account?next=/dalali");
   if (user.role === "ADMIN") redirect("/admin");
   if (user.role === "TENANT") redirect("/account");
   const { payment } = await searchParams;

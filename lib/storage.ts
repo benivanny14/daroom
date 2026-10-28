@@ -5,7 +5,7 @@ import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, List
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 export const LOCAL_MEDIA_URL_PREFIX = "/uploads";
-export const MAX_MEDIA_BYTES = 15 * 1024 * 1024;
+export const MAX_MEDIA_BYTES = 5 * 1024 * 1024;
 
 let client: S3Client | undefined;
 

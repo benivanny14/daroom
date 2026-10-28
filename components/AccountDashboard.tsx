@@ -65,6 +65,7 @@ export function AccountDashboard({ user: initialUser }: { user: SessionUser }) {
   const [message, setMessage] = useState("");
   const [profileBusy, setProfileBusy] = useState(false);
   const [passwordBusy, setPasswordBusy] = useState(false);
+  const [showPasswords, setShowPasswords] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
   const [removingId, setRemovingId] = useState("");
   const [cancellingId, setCancellingId] = useState("");
@@ -246,13 +247,21 @@ export function AccountDashboard({ user: initialUser }: { user: SessionUser }) {
         <article className="panel">
           <span className="eyebrow">Security</span>
           <h2>Change password</h2>
+          <button
+            type="button"
+            className="text-action"
+            aria-pressed={showPasswords}
+            onClick={() => setShowPasswords((current) => !current)}
+          >
+            {showPasswords ? "Hide passwords" : "Show passwords"}
+          </button>
           <form className="account-form" onSubmit={changePassword}>
             <label htmlFor="current-password">Current password</label>
-            <input id="current-password" name="currentPassword" type="password" autoComplete="current-password" required />
+            <input id="current-password" name="currentPassword" type={showPasswords ? "text" : "password"} autoComplete="current-password" required />
             <label htmlFor="new-password">New password</label>
-            <input id="new-password" name="newPassword" type="password" autoComplete="new-password" minLength={12} maxLength={128} required />
+            <input id="new-password" name="newPassword" type={showPasswords ? "text" : "password"} autoComplete="new-password" minLength={12} maxLength={128} required />
             <label htmlFor="confirm-password">Repeat new password</label>
-            <input id="confirm-password" name="confirmPassword" type="password" autoComplete="new-password" minLength={12} maxLength={128} required />
+            <input id="confirm-password" name="confirmPassword" type={showPasswords ? "text" : "password"} autoComplete="new-password" minLength={12} maxLength={128} required />
             <small>Passwords must be at least 12 characters. If you change it, other devices will be signed out automatically.</small>
             <button className="wide-button" type="submit" disabled={passwordBusy}>
               {passwordBusy ? "Changing..." : "Change password"}

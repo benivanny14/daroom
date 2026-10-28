@@ -7,6 +7,7 @@ import { withRateLimit } from "@/lib/rate-limit-middleware";
 import { setSecurityHeaders } from "@/lib/security";
 import { readJsonBody } from "@/lib/http";
 import { hasListingWriteAccess } from "@/lib/subscriptions";
+import { photoLimitForPlan } from "@/lib/subscriptions-plans";
 import { z } from "zod";
 
 export const dynamic = "force-dynamic";
@@ -38,16 +39,17 @@ export async function POST(
         return NextResponse.json({ error: "You do not have permission to add photos." }, { status: 403 });
       }
 
-      if (listing.photos.length >= 10) {
-        return NextResponse.json({ error: "You have reached the maximum number of photos (10)." }, { status: 400 });
-      }
-
       const subscription = await prisma.subscription.findFirst({
         where: { userId: user.id },
         orderBy: { endsAt: "desc" }
       });
       if (!hasListingWriteAccess(subscription)) {
         return NextResponse.json({ error: "Your subscription has expired. Pay TSh 5,000 before adding photos." }, { status: 403 });
+      }
+
+      const photoLimit = photoLimitForPlan(subscription?.plan);
+      if (listing.photos.length >= photoLimit) {
+        return NextResponse.json({ error: `You have reached the maximum number of photos (${photoLimit}).` }, { status: 400 });
       }
 
       const rawBody = await readJsonBody(request, 2 * 1024);

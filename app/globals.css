@@ -424,6 +424,15 @@ img { max-width: 100%; }
 .account-intro { margin: 0 0 18px; color: var(--muted); font-size: 14px; line-height: 1.6; }
 .account-form { display: grid; gap: 8px; }
 .account-form small { color: var(--muted); font-size: 12px; }
+.password-field { position: relative; display: flex; align-items: center; }
+.password-field input { padding-right: 74px; }
+.password-toggle {
+  position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+  min-height: 32px; padding: 4px 9px; border: 1px solid var(--line); border-radius: 0;
+  background: var(--surface); color: var(--green); font-size: 12px; font-weight: 750; cursor: pointer;
+}
+.password-toggle:hover, .password-toggle:focus-visible { border-color: var(--green); }
+.account-form .text-action { justify-self: start; margin: 2px 0 0; }
 .account-form .wide-button { margin-top: 12px; }
 .account-switch { display: flex; flex-wrap: wrap; gap: 8px 15px; margin: 16px 0; }
 .account-switch button, .text-action { min-height: 38px; padding: 6px 0; border: 0; background: transparent; color: var(--green); font-size: 13px; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
