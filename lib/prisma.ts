@@ -39,13 +39,39 @@ o/bKiIz+Fq8=
 -----END CERTIFICATE-----`;
 
 /**
+ * Supabase's session pooler allows only ~15 connections in total while every
+ * serverless function instance opens its own pool (pg defaults to 10), so the
+ * pool is kept deliberately small and released quickly when idle.
+ */
+const POOL_LIMITS = {
+  max: 3,
+  idleTimeoutMillis: 10_000,
+  connectionTimeoutMillis: 10_000,
+  allowExitOnIdle: true
+} as const;
+
+type DbPoolConfig = {
+  connectionString?: string;
+  host?: string;
+  port?: number;
+  user?: string;
+  password?: string;
+  database?: string;
+  ssl?: { ca: string; rejectUnauthorized: true };
+  max: number;
+  idleTimeoutMillis: number;
+  connectionTimeoutMillis: number;
+  allowExitOnIdle: boolean;
+};
+
+/**
  * pg's connection-string parsing merges `ssl` differently from an explicit
  * config, so a pinned CA is only honoured when host/user/password are passed
- * directly. Local Postgres (no TLS) is left untouched.
+ * directly. Local Postgres (no TLS) keeps the plain connection string.
  */
-function poolConfig(): { connectionString?: string; host?: string; port?: number; user?: string; password?: string; database?: string; ssl?: { ca: string; rejectUnauthorized: true } } {
+function poolConfig(): DbPoolConfig {
   if (!/\.supabase\.(co|com)$/i.test(new URL(connectionString).hostname)) {
-    return { connectionString };
+    return { connectionString, ...POOL_LIMITS };
   }
   const url = new URL(connectionString);
   return {
@@ -54,7 +80,8 @@ function poolConfig(): { connectionString?: string; host?: string; port?: number
     user: decodeURIComponent(url.username),
     password: decodeURIComponent(url.password),
     database: url.pathname.replace(/^\//, ""),
-    ssl: { ca: SUPABASE_ROOT_CA, rejectUnauthorized: true }
+    ssl: { ca: SUPABASE_ROOT_CA, rejectUnauthorized: true },
+    ...POOL_LIMITS
   };
 }
 

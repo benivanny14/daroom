@@ -160,8 +160,10 @@ curl http://localhost:3000/api/cron/subscriptions \
 
 Without `CRON_SECRET` both endpoints return `401`.
 
-`vercel.json` schedules them automatically on Vercel (hourly at :00, and
-daily at 06:00). On any other host add an equivalent scheduler entry — for
+`vercel.json` schedules them automatically on Vercel (daily at 05:00 and
+06:00 UTC — the Hobby plan allows one run per day per cron, so the expiry pass
+runs once daily instead of hourly). On any other host add an equivalent
+scheduler entry — for
 example a GitHub Actions workflow on `schedule:` or a crontab line:
 
 ```cron
@@ -237,8 +239,9 @@ credentials and use a managed PostgreSQL instance with backups.
    `RESEND_API_KEY`/`EMAIL_FROM`, `S3_*`/`MEDIA_PUBLIC_BASE_URL`, `SELCOM_*`,
    plus the `NEXT_PUBLIC_SUPABASE_*` / `SUPABASE_SECRET_KEY` coordinates.
    Never commit `.env` (it is gitignored).
-4. **Cron** — the `crons` block in `vercel.json` calls both endpoints hourly
-   and daily; `CRON_SECRET` must be set in Vercel or they return `401`.
+4. **Cron** — the `crons` block in `vercel.json` calls both endpoints daily
+   (05:00 and 06:00 UTC; the Hobby plan allows one run per day per cron);
+   `CRON_SECRET` must be set in Vercel or they return `401`.
 5. **Final gate** — confirm `PAYMENTS_MOCK` is unset/false, the local upload
    driver stays disabled (it checks `NODE_ENV`), seed passwords are replaced,
    and backups/point-in-time recovery are enabled on Supabase.

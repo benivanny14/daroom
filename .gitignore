@@ -9,3 +9,6 @@ public/uploads/
 *.tsbuildinfo
 *.log
 .smoke/
+.vercel
+.env*
+.vercel/
