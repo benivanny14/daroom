@@ -4,20 +4,20 @@ import { readJsonBody } from "./http";
 import { formatTanzaniaPhone, maskPhone, normalizeTanzaniaPhone } from "./phone";
 import { isSafeStorageKey } from "./storage";
 import { LISTING_DURATION_DAYS, listingExpiryFrom, notExpiredFilter } from "./listing-policy";
-import { SUBSCRIPTION_PLANS, canUserAddListing, hasFeaturedSlots } from "./subscriptions-plans";
+import { SUBSCRIPTION_PLANS, canUserAddListing, hasFeaturedSlots, photoLimitForPlan } from "./subscriptions-plans";
 
 const MB = 1024 * 1024;
 
 describe("photo upload policy", () => {
-  it("accepts a photo up to the 5 MB limit", () => {
-    expect(validateFileUpload({ type: "image/jpeg", size: 5 * MB, name: "room.jpg" }).valid).toBe(true);
+  it("accepts a photo up to the 15 MB limit", () => {
+    expect(validateFileUpload({ type: "image/jpeg", size: 15 * MB, name: "room.jpg" }).valid).toBe(true);
     expect(validateFileUpload({ type: "image/webp", size: 1 * MB, name: "room.webp" }).valid).toBe(true);
   });
 
   it("rejects a photo one byte over the limit", () => {
-    const result = validateFileUpload({ type: "image/jpeg", size: 5 * MB + 1, name: "room.jpg" });
+    const result = validateFileUpload({ type: "image/jpeg", size: 15 * MB + 1, name: "room.jpg" });
     expect(result.valid).toBe(false);
-    expect(result.error).toContain("5MB");
+    expect(result.error).toContain("15MB");
   });
 
   it("rejects types and extensions that are not allowed", () => {
@@ -106,6 +106,14 @@ describe("plan rules", () => {
     expect(canUserAddListing(5, "BASIC")).toBe(false);
     expect(canUserAddListing(20, "PREMIUM")).toBe(false);
     expect(canUserAddListing(0, "NOT_A_PLAN")).toBe(false);
+  });
+
+  it("enforces the photo limit of each plan", () => {
+    expect(photoLimitForPlan("BASIC")).toBe(5);
+    expect(photoLimitForPlan("PREMIUM")).toBe(10);
+    expect(photoLimitForPlan("FEATURED")).toBe(10);
+    expect(photoLimitForPlan("NOT_A_PLAN")).toBe(10);
+    expect(photoLimitForPlan(null)).toBe(10);
   });
 });
 

@@ -60,7 +60,7 @@ full flow working without credentials:
   `NODE_ENV` is not `production`, uploads are written to `public/uploads` and
   served as `/uploads/...`. The signed PUT endpoint
   `app/api/uploads/local/route.ts` validates the HMAC signature, content type,
-  magic bytes, and the 5 MB limit. This driver is disabled in production.
+  magic bytes, and the 15 MB limit. This driver is disabled in production.
 - **Payments** (`lib/payments.ts`): when `PAYMENTS_MOCK="true"` and
   `NODE_ENV` is not `production`, checkout returns
   `/api/payments/mock/checkout`, which marks the pending payment as verified
@@ -77,9 +77,14 @@ unusable accounts:
 - “Forgot password” and “resend verification” return a clear `503` explaining
   that email delivery is not configured yet.
 
-Once Resend is configured, verification and password-reset emails are sent and
-the normal verification requirement returns automatically. No code change is
-needed.
+Once a real Resend sender is configured, verification and password-reset
+emails are sent and the normal verification requirement returns automatically.
+No code change is needed.
+
+> **Resend sandbox sender:** `onboarding@resend.dev` only delivers to the Resend
+> account owner. It is treated as “not configured” so registration stays open
+> for everyone. Verify a domain at resend.com/domains, then set `EMAIL_FROM` to
+> an address on that domain (for example `DarRoom <no-reply@darroom.co.tz>`).
 
 ### Phone privacy and reports
 
@@ -107,7 +112,7 @@ needed.
   account favorites, and their viewing appointments.
 - `/dalali` is the agent dashboard: subscription status and checkout, listing
   create/edit/hide/restore, multi-photo upload (Basic 5, Premium/Featured 10,
-  hard ceiling 10; 5 MB per photo), analytics,
+  hard ceiling 10; 15 MB per photo), analytics,
   availability toggle, expiry and 60-day renewal, viewing management (bookings
   are confirmed immediately, with no agent approval step), and ID verification
   submission.

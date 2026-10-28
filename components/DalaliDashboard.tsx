@@ -69,7 +69,7 @@ type FormValues = {
   allowsStudents: boolean;
 };
 
-const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
+const MAX_PHOTO_BYTES = 15 * 1024 * 1024;
 const MAX_PHOTO_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
 
 function describePhoto(file: File, position: number) {
@@ -236,7 +236,7 @@ export function DalaliDashboard({
         continue;
       }
       if (file.size > MAX_PHOTO_BYTES) {
-        problems.push(`${file.name}: must not exceed 5 MB.`);
+        problems.push(`${file.name}: must not exceed 15 MB.`);
         continue;
       }
       if (existingCount + formPhotos.length + accepted.length >= photoLimit) {
@@ -487,7 +487,7 @@ export function DalaliDashboard({
       throw new Error("Use a JPEG, PNG, or WebP photo.");
     }
     if (file.size > MAX_PHOTO_BYTES) {
-      throw new Error("Photo must not exceed 5 MB.");
+      throw new Error("Photo must not exceed 15 MB.");
     }
     const presignResponse = await fetch(`/api/dalali/listings/${listingId}/photos`, {
       method: "POST",
@@ -873,7 +873,7 @@ export function DalaliDashboard({
             <fieldset className="form-photos">
               <legend>Photos</legend>
               <p className="fine-print">
-                Add up to {photoLimit} photos, 5 MB each (JPEG, PNG or WebP). The first
+                Add up to {photoLimit} photos, 15 MB each (JPEG, PNG or WebP). The first
                 photo is the cover and tenants can browse the rest as a slideshow.
               </p>
 
@@ -1002,7 +1002,7 @@ export function DalaliDashboard({
                 ))}
               </div>
               <p className="fine-print">
-                Select several photos at once. Up to {photoLimit} photos per listing, 5 MB each
+                Select several photos at once. Up to {photoLimit} photos per listing, 15 MB each
                 (JPEG, PNG, or WebP). The first photo is used as the cover, and tenants can browse the rest as a slideshow.
               </p>
               <div className="listing-details">

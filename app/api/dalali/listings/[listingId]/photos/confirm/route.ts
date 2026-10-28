@@ -70,7 +70,7 @@ export async function POST(
       if (
         !object ||
         object.size <= 0 ||
-        object.size > 5 * 1024 * 1024 ||
+        object.size > 15 * 1024 * 1024 ||
         !extension ||
         !allowedExtensions.includes(extension) ||
         !contentTypeAllowed

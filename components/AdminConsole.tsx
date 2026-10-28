@@ -249,8 +249,8 @@ export function AdminConsole() {
   }
 
   async function uploadHero(file: File) {
-    if (file.size > 5 * 1024 * 1024) {
-      setError("The image must not exceed 5 MB.");
+    if (file.size > 15 * 1024 * 1024) {
+      setError("The image must not exceed 15 MB.");
       return;
     }
     setHeroBusy(true);
@@ -551,7 +551,7 @@ export function AdminConsole() {
                 <h2>Hero image</h2>
                 <p className="panel-subtitle">
                   This photo is shown behind “Welcome home.” at the top of the home page.
-                  JPEG, PNG or WebP, up to 5 MB. Remove it to show the default illustration.
+                  JPEG, PNG or WebP, up to 15 MB. Remove it to show the default illustration.
                 </p>
               </div>
             </div>

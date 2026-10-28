@@ -13,8 +13,18 @@ function escapeHtml(value: string): string {
   });
 }
 
+/**
+ * Resend's shared `onboarding@resend.dev` sender is a sandbox address: it can
+ * only deliver to the Resend account owner. Treat it as "not configured" so
+ * registration and login stay usable for every visitor until a verified domain
+ * is connected.
+ */
+function usingResendSandbox(): boolean {
+  return /@resend\.dev\b/i.test(process.env.EMAIL_FROM || "");
+}
+
 export function emailConfigured(): boolean {
-  return Boolean(process.env.RESEND_API_KEY && process.env.EMAIL_FROM);
+  return Boolean(process.env.RESEND_API_KEY && process.env.EMAIL_FROM) && !usingResendSandbox();
 }
 
 export async function sendEmail(input: {
