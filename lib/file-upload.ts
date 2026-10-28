@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-const MAX_FILE_SIZE = 15 * 1024 * 1024; // 15MB
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 const ALLOWED_MIME_TYPES = [
   "image/jpeg",
   "image/jpg",
@@ -10,7 +10,7 @@ const ALLOWED_MIME_TYPES = [
 
 const FILE_UPLOAD_SCHEMA = z.object({
   type: z.enum(["image/jpeg", "image/jpg", "image/png", "image/webp"]),
-  size: z.number().int().positive().max(MAX_FILE_SIZE, "Photo must not exceed 15MB"),
+  size: z.number().int().positive().max(MAX_FILE_SIZE, "Photo must not exceed 5MB"),
   name: z.string().max(255)
 });
 
@@ -43,7 +43,7 @@ export function validateFileUpload(file: FileUploadLike): { valid: boolean; erro
   }
 
   if (file.size > MAX_FILE_SIZE) {
-    return { valid: false, error: "Photo must not exceed 15MB." };
+    return { valid: false, error: "Photo must not exceed 5MB." };
   }
 
   // Check file extension matches MIME type

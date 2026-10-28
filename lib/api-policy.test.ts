@@ -9,15 +9,15 @@ import { SUBSCRIPTION_PLANS, canUserAddListing, hasFeaturedSlots } from "./subsc
 const MB = 1024 * 1024;
 
 describe("photo upload policy", () => {
-  it("accepts a photo up to the 15 MB limit", () => {
-    expect(validateFileUpload({ type: "image/jpeg", size: 15 * MB, name: "room.jpg" }).valid).toBe(true);
+  it("accepts a photo up to the 5 MB limit", () => {
+    expect(validateFileUpload({ type: "image/jpeg", size: 5 * MB, name: "room.jpg" }).valid).toBe(true);
     expect(validateFileUpload({ type: "image/webp", size: 1 * MB, name: "room.webp" }).valid).toBe(true);
   });
 
   it("rejects a photo one byte over the limit", () => {
-    const result = validateFileUpload({ type: "image/jpeg", size: 15 * MB + 1, name: "room.jpg" });
+    const result = validateFileUpload({ type: "image/jpeg", size: 5 * MB + 1, name: "room.jpg" });
     expect(result.valid).toBe(false);
-    expect(result.error).toContain("15MB");
+    expect(result.error).toContain("5MB");
   });
 
   it("rejects types and extensions that are not allowed", () => {
