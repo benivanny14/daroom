@@ -71,6 +71,140 @@ async function supabaseObjectInfo(key: string): Promise<{ size: number; contentT
   };
 }
 
+// --------------------------------------------------------------- private bucket
+
+/**
+ * Identity documents must never live in the public media bucket: a public
+ * object stays readable by anyone who learns its URL, forever. They are kept in
+ * a separate private bucket instead and only ever served through a short-lived
+ * signed URL handed to an authenticated administrator.
+ */
+const SUPABASE_PRIVATE_BUCKET = process.env.SUPABASE_PRIVATE_BUCKET || "darroom-private";
+
+function privateObjectUrl(key: string): string {
+  return `${supabaseBaseUrl()}/storage/v1/object/${SUPABASE_PRIVATE_BUCKET}/${encodeStorageKey(key)}`;
+}
+
+/** Identity-document keys always live under `verification/`. */
+export function isSafeVerificationKey(key: string): boolean {
+  return (
+    key.startsWith("verification/") &&
+    key.length <= 300 &&
+    !key.includes("..") &&
+    !key.includes("\\") &&
+    !key.startsWith("/")
+  );
+}
+
+async function generateSupabasePrivateUploadUrl(key: string, expiresIn: number): Promise<string> {
+  if (!isSafeVerificationKey(key)) throw new Error("Invalid verification key.");
+  const response = await fetch(
+    `${supabaseBaseUrl()}/storage/v1/object/upload/sign/${SUPABASE_PRIVATE_BUCKET}/${encodeStorageKey(key)}`,
+    {
+      method: "POST",
+      headers: { ...supabaseHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify({ expiresIn })
+    }
+  );
+  if (!response.ok) throw new Error("Could not create a document upload link.");
+  const data = (await response.json()) as { url?: string };
+  if (!data.url) throw new Error("Could not create a document upload link.");
+  return `${supabaseBaseUrl()}/storage/v1${data.url}`;
+}
+
+/** Upload target for an identity document (private bucket in production). */
+export async function generateVerificationUploadUrl(
+  key: string,
+  contentType: string,
+  expiresIn: number = 300
+): Promise<string> {
+  if (localStorageEnabled()) {
+    if (!isSafeVerificationKey(key)) throw new Error("Invalid verification key.");
+    return localUploadUrl(key, contentType, expiresIn);
+  }
+  if (supabaseStorageConfigured()) return generateSupabasePrivateUploadUrl(key, expiresIn);
+
+  // S3 buckets are private by default, so a presigned PUT is already safe.
+  const { uploadUrl } = await generatePresignedUploadUrl(key, contentType, expiresIn);
+  return uploadUrl;
+}
+
+/** Metadata for an uploaded identity document, or null when it is missing. */
+export async function verificationObjectInfo(
+  key: string
+): Promise<{ size: number; contentType?: string } | null> {
+  if (!isSafeVerificationKey(key)) return null;
+  if (localStorageEnabled()) return localObjectInfo(key);
+  if (supabaseStorageConfigured()) {
+    try {
+      const response = await fetch(privateObjectUrl(key), { method: "HEAD", headers: supabaseHeaders() });
+      if (!response.ok) return null;
+      return {
+        size: Number(response.headers.get("content-length") || 0),
+        contentType: response.headers.get("content-type") || undefined
+      };
+    } catch {
+      return null;
+    }
+  }
+  try {
+    const { client, bucket } = objectStorage();
+    const object = await client.send(new HeadObjectCommand({ Bucket: bucket, Key: key }));
+    return { size: object.ContentLength ?? 0, contentType: object.ContentType };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Time-limited URL for one identity document. Only an authenticated admin ever
+ * receives one, and the link stops working after `expiresIn` seconds.
+ */
+export async function getVerificationDownloadUrl(
+  key: string,
+  expiresIn: number = 600
+): Promise<string | null> {
+  if (!isSafeVerificationKey(key)) return null;
+  if (localStorageEnabled()) return `${LOCAL_MEDIA_URL_PREFIX}/${key}`;
+  if (supabaseStorageConfigured()) {
+    try {
+      const response = await fetch(
+        `${supabaseBaseUrl()}/storage/v1/object/sign/${SUPABASE_PRIVATE_BUCKET}/${encodeStorageKey(key)}`,
+        {
+          method: "POST",
+          headers: { ...supabaseHeaders(), "Content-Type": "application/json" },
+          body: JSON.stringify({ expiresIn })
+        }
+      );
+      if (!response.ok) return null;
+      const data = (await response.json()) as { signedURL?: string; signedUrl?: string };
+      const signed = data.signedURL || data.signedUrl;
+      return signed ? `${supabaseBaseUrl()}/storage/v1${signed}` : null;
+    } catch {
+      return null;
+    }
+  }
+  try {
+    return await generatePresignedDownloadUrl(key, expiresIn);
+  } catch {
+    return null;
+  }
+}
+
+export async function deleteVerificationObject(key: string): Promise<void> {
+  if (!isSafeVerificationKey(key)) return;
+  if (localStorageEnabled()) return deleteLocalObject(key);
+  if (supabaseStorageConfigured()) {
+    const response = await fetch(privateObjectUrl(key), { method: "DELETE", headers: supabaseHeaders() });
+    if (!response.ok && response.status !== 400 && response.status !== 404) {
+      throw new Error("Could not delete the identity document.");
+    }
+    return;
+  }
+  const { client, bucket } = objectStorage();
+  await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
+}
+
 async function deleteSupabaseObject(key: string): Promise<void> {
   const response = await fetch(supabaseObjectUrl(key), { method: "DELETE", headers: supabaseHeaders() });
   // Supabase answers 400 with a "not_found" body when the object is already gone.

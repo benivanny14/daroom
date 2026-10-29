@@ -3,7 +3,7 @@ import { AuthError, assertSameOrigin, requireAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { banDalali } from "@/lib/moderation";
 import { recordAdminAudit } from "@/lib/audit";
-import { deleteMediaObject } from "@/lib/storage";
+import { deleteMediaObject, deleteVerificationObject } from "@/lib/storage";
 import { readJsonBody } from "@/lib/http";
 import { clientIp } from "@/lib/rate-limit";
 import { z } from "zod";
@@ -51,10 +51,8 @@ export async function POST(
         select: { documentUrl: true }
       })
     ]);
-    const storageKeys = [
-      ...listings.flatMap((listing) => listing.photos.map((photo) => photo.storageKey)),
-      ...documents.map((document) => document.documentUrl)
-    ];
+    const photoKeys = listings.flatMap((listing) => listing.photos.map((photo) => photo.storageKey));
+    const documentKeys = documents.map((document) => document.documentUrl);
 
     await banDalali(prisma, {
       userId: target.id,
@@ -64,10 +62,17 @@ export async function POST(
       moderatorId: admin.id
     });
 
-    await Promise.allSettled(storageKeys.map((key) => deleteMediaObject(key))).then((results) => {
-      const failed = results.filter((result) => result.status === "rejected").length;
-      if (failed) console.error("Could not delete every file of a banned account", { failed });
-    });
+    // Public photos and private identity documents live in different buckets.
+    const deletions = await Promise.allSettled([
+      ...photoKeys.map((key) => deleteMediaObject(key)),
+      ...documentKeys.map((key) =>
+        key.startsWith("verification/")
+          ? deleteVerificationObject(key)
+          : deleteMediaObject(key)
+      )
+    ]);
+    const failed = deletions.filter((result) => result.status === "rejected").length;
+    if (failed) console.error("Could not delete every file of a banned account", { failed });
 
     await recordAdminAudit({
       actorId: admin.id,

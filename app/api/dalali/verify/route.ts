@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { assertSameOrigin, authErrorResponse, requireAgent } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { generateUploadUrl, objectInfo } from "@/lib/storage";
-import { validateFileUpload, generateStorageKey } from "@/lib/file-upload";
+import { deleteMediaObject, deleteVerificationObject, generateVerificationUploadUrl, verificationObjectInfo } from "@/lib/storage";
+import { validateFileUpload, generateVerificationKey } from "@/lib/file-upload";
 import { withRateLimit } from "@/lib/rate-limit-middleware";
 import { setSecurityHeaders } from "@/lib/security";
 import { z } from "zod";
@@ -40,8 +40,9 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: validation.error }, { status: 400 });
       }
 
-      const storageKey = generateStorageKey(user.id, "verification", file.name);
-      const { uploadUrl } = await generateUploadUrl(storageKey, body.data.contentType, 300, body.data.size);
+      // Identity documents go to the private bucket, not the public media one.
+      const storageKey = generateVerificationKey(user.id, file.name);
+      const uploadUrl = await generateVerificationUploadUrl(storageKey, body.data.contentType, 300);
 
       const response = NextResponse.json({
         uploadUrl,
@@ -68,10 +69,10 @@ export async function PUT(request: NextRequest) {
       if (!body.success) {
         return NextResponse.json({ error: "Document details are invalid." }, { status: 400 });
       }
-      if (!body.data.storageKey.startsWith(`listings/${user.id}/verification/`)) {
+      if (!body.data.storageKey.startsWith(`verification/${user.id}/`)) {
         return NextResponse.json({ error: "This document is not accepted." }, { status: 400 });
       }
-      const object = await objectInfo(body.data.storageKey);
+      const object = await verificationObjectInfo(body.data.storageKey);
       if (!object || object.size <= 0 || object.size > 15 * 1024 * 1024) {
         return NextResponse.json({ error: "The document was not uploaded or is too large." }, { status: 400 });
       }
@@ -107,6 +108,16 @@ export async function PUT(request: NextRequest) {
               verifiedAt: null
             }
           });
+
+      // Replacing a document leaves the old one stored forever; remove it so a
+      // rejected identity document cannot be fetched later.
+      if (existing && existing.documentUrl && existing.documentUrl !== body.data.storageKey) {
+        const previous = existing.documentUrl;
+        (previous.startsWith("verification/")
+          ? deleteVerificationObject(previous)
+          : deleteMediaObject(previous)
+        ).catch((error) => console.error("Could not delete the previous identity document", error));
+      }
 
       const response = NextResponse.json({
         verification: {

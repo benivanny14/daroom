@@ -4,6 +4,7 @@ import { recordAdminAudit } from "@/lib/audit";
 import { readJsonBody } from "@/lib/http";
 import { prisma } from "@/lib/prisma";
 import { clientIp } from "@/lib/rate-limit";
+import { deleteVerificationObject } from "@/lib/storage";
 import { z } from "zod";
 
 export const dynamic = "force-dynamic";
@@ -34,7 +35,13 @@ export async function POST(
 
     const verification = await prisma.idVerification.findUnique({
       where: { id: verificationId },
-      select: { id: true, userId: true, status: true, user: { select: { email: true } } }
+      select: {
+        id: true,
+        userId: true,
+        status: true,
+        documentUrl: true,
+        user: { select: { email: true } }
+      }
     });
     if (!verification) {
       return NextResponse.json({ error: "Document not found." }, { status: 404 });
@@ -50,6 +57,14 @@ export async function POST(
       },
       select: { id: true, status: true }
     });
+
+    // A rejected document is personal data with no further use, so it is
+    // deleted from storage instead of being kept around.
+    if (!approved && verification.documentUrl.startsWith("verification/")) {
+      deleteVerificationObject(verification.documentUrl).catch((error) =>
+        console.error("Could not delete a rejected identity document", error)
+      );
+    }
 
     await recordAdminAudit({
       actorId: admin.id,

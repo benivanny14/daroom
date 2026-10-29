@@ -79,6 +79,19 @@ export function generateStorageKey(userId: string, listingId: string, originalNa
   return `listings/${userId}/${listingId}/${timestamp}-${baseName}.${extension}`;
 }
 
+/**
+ * Identity documents are stored in the private bucket under
+ * `verification/<userId>/`, never in the publicly readable `listings/` prefix.
+ */
+export function generateVerificationKey(userId: string, originalName: string): string {
+  const timestamp = Date.now();
+  const sanitizedName = sanitizeFileName(originalName) || "document.jpg";
+  const dot = sanitizedName.lastIndexOf(".");
+  const extension = dot > 0 ? sanitizedName.slice(dot + 1).toLowerCase() : "jpg";
+  const baseName = dot > 0 ? sanitizedName.slice(0, dot) : sanitizedName;
+  return `verification/${userId}/${timestamp}-${baseName || "document"}.${extension}`;
+}
+
 export function validateImageDimensions(
   width: number,
   height: number

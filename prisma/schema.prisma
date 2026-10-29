@@ -400,7 +400,8 @@ model IdVerification {
   userId         String
   documentType   String
   documentUrl    String
-  status         String    @default("APPROVED")
+  // A document proves nothing until a person has reviewed it.
+  status         String    @default("PENDING")
   rejectedReason String?
   verifiedAt     DateTime?
   createdAt      DateTime  @default(now())
