@@ -1,6 +1,7 @@
 import { createHmac } from "node:crypto";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  SonicPesaError,
   createSonicPesaOrder,
   mapSonicPesaStatus,
   verifySonicPesaWebhook
@@ -120,6 +121,59 @@ describe("SonicPesa create order", () => {
         amountTzs: 50000
       })
     ).rejects.toThrow("Invalid phone number");
+  });
+
+  it("surfaces the provider's rejection message instead of a generic failure", async () => {
+    vi.stubEnv("SONICPESA_ACCESS_KEY", "sk_test_access");
+    vi.stubEnv("SONICPESA_SECRET_KEY", "sk_test_secret");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            status: "error",
+            message: "The balance of customer is not enough for the payment",
+            resultcode: "9009"
+          }),
+          { status: 400, headers: { "Content-Type": "application/json" } }
+        )
+      )
+    );
+
+    const error = await createSonicPesaOrder({
+      buyerName: "Test Tenant",
+      buyerEmail: "tenant@example.com",
+      buyerPhone: "255712345678",
+      amountTzs: 50000
+    }).catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(SonicPesaError);
+    expect((error as SonicPesaError).message).toBe(
+      "The balance of customer is not enough for the payment"
+    );
+    expect((error as SonicPesaError).status).toBe(402);
+  });
+
+  it("keeps a provider outage as a generic failure", async () => {
+    vi.stubEnv("SONICPESA_ACCESS_KEY", "sk_test_access");
+    vi.stubEnv("SONICPESA_SECRET_KEY", "sk_test_secret");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response("upstream exploded", { status: 503, headers: { "Content-Type": "text/plain" } })
+      )
+    );
+
+    const error = await createSonicPesaOrder({
+      buyerName: "Test Tenant",
+      buyerEmail: "tenant@example.com",
+      buyerPhone: "255712345678",
+      amountTzs: 50000
+    }).catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(SonicPesaError);
+    expect((error as SonicPesaError).message).toBe("SonicPesa did not accept the payment request.");
+    expect((error as SonicPesaError).status).toBe(502);
   });
 
   it("refuses amounts outside the allowed range before calling the provider", async () => {

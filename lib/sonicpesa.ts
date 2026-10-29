@@ -100,12 +100,30 @@ async function readProviderResponse(response: Response): Promise<unknown> {
     if (response.status === 401 || response.status === 403) {
       throw new SonicPesaError("SonicPesa rejected the merchant credentials.", 502);
     }
+    // A 4xx is the provider refusing this specific payment (insufficient balance,
+    // invalid phone, ...). Pass its wording through so the payer sees why, while
+    // 5xx stays a generic provider failure.
+    const rejection = providerRejectionMessage(raw);
+    if (response.status < 500 && rejection) {
+      throw new SonicPesaError(rejection, 402);
+    }
     throw new SonicPesaError("SonicPesa did not accept the payment request.", 502);
   }
   try {
     return JSON.parse(raw);
   } catch {
     throw new SonicPesaError("SonicPesa returned an unrecognized response.", 502);
+  }
+}
+
+/** Pulls the provider's own `message` field out of a rejection body. */
+function providerRejectionMessage(raw: string): string | null {
+  try {
+    const message = (JSON.parse(raw) as { message?: unknown }).message;
+    if (typeof message !== "string" || !message.trim()) return null;
+    return message.trim().slice(0, 200);
+  } catch {
+    return null;
   }
 }
 
