@@ -360,6 +360,9 @@ model Review {
   rating     Int
   comment    String
   isVerified Boolean  @default(false)
+  // Keyed hash of the author's address, used only to stop one person filling a
+  // room with reviews. Null for reviews written before this field existed.
+  authorIpHash String?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
   listing    Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
@@ -367,6 +370,7 @@ model Review {
 
   @@index([listingId])
   @@index([userId])
+  @@index([listingId, authorIpHash])
 }
 
 model ListingAnalytics {

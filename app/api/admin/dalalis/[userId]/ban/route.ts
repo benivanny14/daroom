@@ -3,6 +3,7 @@ import { AuthError, assertSameOrigin, requireAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { banDalali } from "@/lib/moderation";
 import { recordAdminAudit } from "@/lib/audit";
+import { deleteMediaObject } from "@/lib/storage";
 import { readJsonBody } from "@/lib/http";
 import { clientIp } from "@/lib/rate-limit";
 import { z } from "zod";
@@ -37,12 +38,35 @@ export async function POST(
       return NextResponse.json({ error: "Agent account not found." }, { status: 404 });
     }
 
+    // Collect the stored files first: the transaction removes the rows that
+    // point at them, and leaving them behind would keep deleted accounts' photos
+    // and identity documents online forever.
+    const [listings, documents] = await Promise.all([
+      prisma.listing.findMany({
+        where: { ownerId: target.id },
+        select: { photos: { select: { storageKey: true } } }
+      }),
+      prisma.idVerification.findMany({
+        where: { userId: target.id },
+        select: { documentUrl: true }
+      })
+    ]);
+    const storageKeys = [
+      ...listings.flatMap((listing) => listing.photos.map((photo) => photo.storageKey)),
+      ...documents.map((document) => document.documentUrl)
+    ];
+
     await banDalali(prisma, {
       userId: target.id,
       normalizedPhone: target.phone,
       normalizedEmail: target.email.toLowerCase(),
       reason: parsed.data.reason,
       moderatorId: admin.id
+    });
+
+    await Promise.allSettled(storageKeys.map((key) => deleteMediaObject(key))).then((results) => {
+      const failed = results.filter((result) => result.status === "rejected").length;
+      if (failed) console.error("Could not delete every file of a banned account", { failed });
     });
 
     await recordAdminAudit({

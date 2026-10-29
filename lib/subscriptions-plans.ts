@@ -18,7 +18,9 @@ export const SUBSCRIPTION_PLANS: Record<string, SubscriptionPlanConfig> = {
     durationDays: 30,
     maxListings: 10,
     maxPhotosPerListing: 10,
-    featuredSlots: 0,
+    // One featured room is part of the paid plan; zero made the "Feature"
+    // button fail for every paying agent.
+    featuredSlots: 1,
     prioritySupport: false,
     analytics: true
   },

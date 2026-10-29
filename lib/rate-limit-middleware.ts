@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { hashIp } from "@/lib/audit";
 
 const WINDOW_MS = Number(process.env.RATE_LIMIT_WINDOW_MS) || 60000; // 1 minute default
 const MAX_REQUESTS = Number(process.env.RATE_LIMIT_MAX_REQUESTS) || 100;
@@ -65,7 +66,9 @@ export function getRateLimitIdentifier(request: NextRequest): string {
              request.headers.get("x-real-ip") ||
              "unknown";
   const path = request.nextUrl.pathname;
-  return `${ip}:${path}`;
+  // The raw address never reaches the table: the bucket key is a keyed hash,
+  // the same one the audit log uses, so no plain IP is stored.
+  return `${hashIp(ip)}:${path}`;
 }
 
 export async function withRateLimit(

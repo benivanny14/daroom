@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { AuthError, assertSameOrigin, getSessionUser } from "@/lib/auth";
+import { hashIp } from "@/lib/audit";
 import { prisma } from "@/lib/prisma";
 import { readJsonBody } from "@/lib/http";
 import { withRateLimit } from "@/lib/rate-limit-middleware";
@@ -59,9 +60,10 @@ export async function POST(request: NextRequest) {
       assertSameOrigin(request);
       // Reviews may be written without an account, so they get their own tight
       // per-IP budget instead of the general API allowance.
+      const visitorIp = clientIp(request.headers);
       if (!(await enforceRateLimit({
         scope: "create-review",
-        clientId: clientIp(request.headers),
+        clientId: visitorIp,
         limit: 5,
         windowSeconds: 3600
       }))) {
@@ -108,21 +110,24 @@ export async function POST(request: NextRequest) {
 
       const cleanAuthor = (body.data.authorName || user?.name || "Tenant").slice(0, 60) || "Tenant";
 
+      const authorIpHash = hashIp(visitorIp);
+
       if (!user) {
-        // Guest reviews cannot be limited per account, so the same text from the
-        // same author on the same listing is only accepted once per hour.
+        // Guests cannot be limited per account, so one address may review the
+        // same room once every 30 days no matter what name it types. Without
+        // this an agent could fill a listing with five-star reviews.
         const duplicate = await prisma.review.findFirst({
           where: {
             listingId: body.data.listingId,
-            userId: null,
-            authorName: cleanAuthor,
-            comment: body.data.comment,
-            createdAt: { gte: new Date(Date.now() - 60 * 60 * 1000) }
+            authorIpHash,
+            createdAt: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) }
           },
           select: { id: true }
         });
         if (duplicate) {
-          return NextResponse.json({ error: "This review was just posted." }, { status: 400 });
+          return NextResponse.json({
+            error: "A review for this room was already sent from this device. Log in to change it."
+          }, { status: 400 });
         }
       }
 
@@ -133,7 +138,8 @@ export async function POST(request: NextRequest) {
           authorName: cleanAuthor,
           rating: body.data.rating,
           comment: body.data.comment,
-          isVerified: Boolean(user)
+          isVerified: Boolean(user),
+          authorIpHash
         }
       });
 

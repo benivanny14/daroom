@@ -47,6 +47,15 @@ type Dalali = {
   } | null;
   _count: { listings: number };
 };
+type BlacklistEntry = {
+  id: string;
+  normalizedEmail: string | null;
+  normalizedPhone: string;
+  reason: string;
+  createdAt: string;
+  moderator?: { name: string } | null;
+};
+type ResetLink = { email: string; url: string; expiresAt: string };
 type Tab = "reports" | "dalalis" | "audit" | "site" | "stats" | "security";
 
 type TotpStatus = { enabled: boolean; configured: boolean };
@@ -87,6 +96,11 @@ export function AdminConsole() {
   const [totpCode, setTotpCode] = useState("");
   const [totpBusy, setTotpBusy] = useState(false);
   const [backupCodes, setBackupCodes] = useState<string[] | null>(null);
+  const [blacklist, setBlacklist] = useState<BlacklistEntry[]>([]);
+  const [verificationBusy, setVerificationBusy] = useState("");
+  const [resetEmail, setResetEmail] = useState("");
+  const [resetBusy, setResetBusy] = useState(false);
+  const [resetLink, setResetLink] = useState<ResetLink | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -126,6 +140,20 @@ export function AdminConsole() {
   }, [tab]);
 
   useEffect(() => { void load(); }, [load]);
+
+  const loadBlacklist = useCallback(async () => {
+    try {
+      const response = await fetch("/api/admin/blacklist", { cache: "no-store" });
+      const body = await response.json();
+      if (response.ok) setBlacklist(body.entries || []);
+    } catch {
+      // The ban list is informational; a failed load must not blank the tab.
+    }
+  }, []);
+
+  useEffect(() => {
+    if (tab === "dalalis") void loadBlacklist();
+  }, [tab, loadBlacklist]);
 
   async function loadMore() {
     const cursor = tab === "reports" ? reportsCursor : tab === "dalalis" ? dalalisCursor : null;
@@ -320,6 +348,71 @@ export function AdminConsole() {
     } catch (caught) { setError(caught instanceof Error ? caught.message : "Ban failed."); }
   }
 
+  async function decideVerification(verificationId: string, action: "approve" | "reject") {
+    let reason: string | undefined;
+    if (action === "reject") {
+      const typed = window.prompt("Why is this document rejected? The agent will see this reason.");
+      if (!typed) return;
+      reason = typed;
+    }
+    setVerificationBusy(verificationId);
+    setError("");
+    setMessage("");
+    try {
+      await sendAction(`/api/admin/verifications/${verificationId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action, reason })
+      }, action === "approve" ? "Identity document approved." : "Identity document rejected.");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "The decision could not be saved.");
+    } finally {
+      setVerificationBusy("");
+    }
+  }
+
+  async function liftBan(entry: BlacklistEntry) {
+    if (!window.confirm(`Lift the ban on ${entry.normalizedEmail || entry.normalizedPhone}? They will be able to register again.`)) return;
+    setError("");
+    setMessage("");
+    try {
+      const response = await fetch("/api/admin/blacklist", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: entry.id })
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error || "The ban could not be lifted.");
+      setBlacklist((current) => current.filter((row) => row.id !== entry.id));
+      setMessage("Ban lifted. The contact can register again.");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "The ban could not be lifted.");
+    }
+  }
+
+  async function createResetLink(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setResetBusy(true);
+    setError("");
+    setMessage("");
+    setResetLink(null);
+    try {
+      const response = await fetch("/api/admin/password-reset-link", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: resetEmail.trim() })
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error || "The link could not be created.");
+      setResetLink({ email: body.user.email, url: body.url, expiresAt: body.expiresAt });
+      setMessage("Reset link created. Send it to the account owner.");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "The link could not be created.");
+    } finally {
+      setResetBusy(false);
+    }
+  }
+
   return (
     <>
       <div className="admin-warning">
@@ -443,6 +536,7 @@ export function AdminConsole() {
             </table>
           </div>
         ) : tab === "dalalis" ? (
+          <>
           <div className="panel admin-table-wrap">
             <table className="admin-table">
               <thead><tr><th>Agent</th><th>Contact</th><th>Subscription</th><th>Verification</th><th>Listings</th><th>Action</th></tr></thead>
@@ -454,10 +548,36 @@ export function AdminConsole() {
                   <td>
                     {dalali.verification ? (
                       <>
-                        <span className="status live">Verified</span>
+                        <span className={`status ${dalali.verification.status === "APPROVED" ? "live" : dalali.verification.status === "REJECTED" ? "flagged" : "pending"}`}>
+                          {dalali.verification.status === "APPROVED"
+                            ? "Verified"
+                            : dalali.verification.status === "REJECTED"
+                              ? "Rejected"
+                              : "Pending review"}
+                        </span>
                         <br /><small>{dalali.verification.documentType}</small>
                         {dalali.verification.url && (
                           <><br /><a href={dalali.verification.url} target="_blank" rel="noreferrer">View document</a></>
+                        )}
+                        {dalali.verification.status !== "APPROVED" && (
+                          <div className="admin-actions">
+                            <button
+                              className="table-action"
+                              type="button"
+                              disabled={verificationBusy === dalali.verification.id}
+                              onClick={() => void decideVerification(dalali.verification!.id, "approve")}
+                            >
+                              Approve ID
+                            </button>
+                            <button
+                              className="table-action destructive"
+                              type="button"
+                              disabled={verificationBusy === dalali.verification.id}
+                              onClick={() => void decideVerification(dalali.verification!.id, "reject")}
+                            >
+                              Reject
+                            </button>
+                          </div>
                         )}
                       </>
                     ) : "None"}
@@ -469,6 +589,71 @@ export function AdminConsole() {
             </table>
             {!error && dalalis.length === 0 && <p className="empty">No Agent accounts.</p>}
           </div>
+
+          <div className="panel admin-stats" style={{ marginTop: 20 }}>
+            <div className="panel-heading">
+              <div>
+                <span className="eyebrow">Account recovery</span>
+                <h2>Password reset link</h2>
+                <p className="panel-subtitle">
+                  Email delivery is not configured yet, so create a one-time link here and send it to the
+                  account owner yourself (WhatsApp). It works once and expires in one hour.
+                </p>
+              </div>
+            </div>
+            <form className="totp-code-form" onSubmit={createResetLink}>
+              <label htmlFor="reset-email">Account email</label>
+              <input
+                id="reset-email"
+                type="email"
+                autoComplete="off"
+                value={resetEmail}
+                onChange={(event) => setResetEmail(event.target.value)}
+                required
+              />
+              <button className="table-action" type="submit" disabled={resetBusy || !resetEmail.trim()}>
+                {resetBusy ? "Working..." : "Create link"}
+              </button>
+            </form>
+            {resetLink && (
+              <div className="notice" role="status">
+                <p><strong>{resetLink.email}</strong></p>
+                <p style={{ wordBreak: "break-all" }}><a href={resetLink.url} target="_blank" rel="noreferrer">{resetLink.url}</a></p>
+                <p className="fine-print">
+                  Expires {new Date(resetLink.expiresAt).toLocaleString("en-GB")}. Send it only to the account owner.
+                </p>
+              </div>
+            )}
+
+            <div className="panel-heading" style={{ marginTop: 20 }}>
+              <div>
+                <span className="eyebrow">Bans</span>
+                <h2>Blacklisted contacts</h2>
+                <p className="panel-subtitle">
+                  A banned email or phone number cannot register again until its entry is removed.
+                </p>
+              </div>
+            </div>
+            <table className="admin-table">
+              <thead><tr><th>Contact</th><th>Reason</th><th>Banned</th><th>Action</th></tr></thead>
+              <tbody>
+                {blacklist.map((entry) => (
+                  <tr key={entry.id}>
+                    <td>{entry.normalizedEmail || "—"}<br /><small>{entry.normalizedPhone}</small></td>
+                    <td>{entry.reason}</td>
+                    <td>{new Date(entry.createdAt).toLocaleDateString("en-GB")}</td>
+                    <td>
+                      <button className="table-action" type="button" onClick={() => void liftBan(entry)}>
+                        Lift ban
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {blacklist.length === 0 && <p className="empty">No banned contacts.</p>}
+          </div>
+          </>
         ) : tab === "security" ? (
           <div className="panel admin-stats">
             <div className="panel-heading">

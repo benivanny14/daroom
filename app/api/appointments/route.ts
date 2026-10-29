@@ -3,6 +3,7 @@ import { assertSameOrigin, authErrorResponse, getSessionUser, requireUser } from
 import { prisma } from "@/lib/prisma";
 import { readJsonBody } from "@/lib/http";
 import { normalizeTanzaniaPhone } from "@/lib/phone";
+import { clientIp, enforceRateLimit } from "@/lib/rate-limit";
 import { withRateLimit } from "@/lib/rate-limit-middleware";
 import { setSecurityHeaders } from "@/lib/security";
 import { notExpiredFilter } from "@/lib/listing-policy";
@@ -67,6 +68,16 @@ export async function POST(request: NextRequest) {
   return withRateLimit(request, async () => {
     try {
       assertSameOrigin(request);
+      // Booking does not need an account, so each address gets a tight budget
+      // of its own: an agent's phone and inbox must not be floodable.
+      if (!(await enforceRateLimit({
+        scope: "create-appointment",
+        clientId: clientIp(request.headers),
+        limit: 5,
+        windowSeconds: 3600
+      }))) {
+        return NextResponse.json({ error: "You've booked several viewings already. Try again later." }, { status: 429 });
+      }
       const rawBody = await readJsonBody(request, 4 * 1024);
       if (!rawBody.ok) {
         return NextResponse.json({ error: "Invalid request or data too large." }, { status: rawBody.status });
@@ -121,6 +132,23 @@ export async function POST(request: NextRequest) {
         });
         if (duplicate) {
           return NextResponse.json({ error: "You've already booked a viewing for this time." }, { status: 400 });
+        }
+      } else {
+        // Same phone, same room, same day: a guest cannot stack bookings.
+        const duplicate = await prisma.viewingAppointment.findFirst({
+          where: {
+            userId: null,
+            listingId: listing.id,
+            tenantPhone: phone,
+            status: { in: ["PENDING", "CONFIRMED"] },
+            createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) }
+          },
+          select: { id: true }
+        });
+        if (duplicate) {
+          return NextResponse.json({
+            error: "You already have a viewing booked for this room. Cancel it first or log in to manage it."
+          }, { status: 400 });
         }
       }
 

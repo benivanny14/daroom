@@ -18,19 +18,46 @@ const REJECTED_BODY = JSON.stringify({ error: "This request was rejected." });
  */
 const SERVER_TO_SERVER = [/^\/api\/cron\//, /^\/api\/payments\/webhook$/];
 
+/**
+ * Endpoints whose response is the same for every visitor and may be cached by
+ * a shared cache. Anything else under `/api` is answered per user, so it must
+ * never be stored by a proxy or a browser cache.
+ */
+const PUBLIC_API = [
+  /^\/api\/listings$/,
+  /^\/api\/listings\/[^/]+$/,
+  /^\/api\/geography$/,
+  /^\/api\/pages\/[^/]+$/,
+  /^\/api\/reviews$/,
+  /^\/api\/auth\/verify$/
+];
+
 function reject(): NextResponse {
-  return new NextResponse(REJECTED_BODY, {
+  const response = new NextResponse(REJECTED_BODY, {
     status: 403,
     headers: { "Content-Type": "application/json" }
   });
+  response.headers.set("Cache-Control", "private, no-store");
+  return response;
+}
+
+/** Marks the response as per-user so no shared cache can replay it. */
+function pass(request: NextRequest): NextResponse {
+  const response = NextResponse.next();
+  const pathname = request.nextUrl.pathname;
+  if (!PUBLIC_API.some((pattern) => pattern.test(pathname))) {
+    response.headers.set("Cache-Control", "private, no-store");
+    response.headers.set("Vary", "Cookie");
+  }
+  return response;
 }
 
 export function middleware(request: NextRequest) {
   if (SERVER_TO_SERVER.some((pattern) => pattern.test(request.nextUrl.pathname))) {
-    return NextResponse.next();
+    return pass(request);
   }
 
-  if (!MUTATING_METHODS.has(request.method)) return NextResponse.next();
+  if (!MUTATING_METHODS.has(request.method)) return pass(request);
 
   const fetchSite = request.headers.get("sec-fetch-site");
   if (fetchSite && fetchSite !== "same-origin" && fetchSite !== "none") {
@@ -53,7 +80,7 @@ export function middleware(request: NextRequest) {
     return reject();
   }
 
-  return NextResponse.next();
+  return pass(request);
 }
 
 export const config = {

@@ -85,15 +85,17 @@ export async function PUT(request: NextRequest) {
         return NextResponse.json({ error: "Your identity is already verified." }, { status: 400 });
       }
 
+      // The document only becomes "verified" once an administrator has looked
+      // at it. Uploading alone proves nothing, so it waits as PENDING.
       const verification = existing
         ? await prisma.idVerification.update({
             where: { id: existing.id },
             data: {
               documentType: body.data.documentType,
               documentUrl: body.data.storageKey,
-              status: "APPROVED",
+              status: "PENDING",
               rejectedReason: null,
-              verifiedAt: new Date()
+              verifiedAt: null
             }
           })
         : await prisma.idVerification.create({
@@ -101,8 +103,8 @@ export async function PUT(request: NextRequest) {
               userId: user.id,
               documentType: body.data.documentType,
               documentUrl: body.data.storageKey,
-              status: "APPROVED",
-              verifiedAt: new Date()
+              status: "PENDING",
+              verifiedAt: null
             }
           });
 
@@ -110,7 +112,8 @@ export async function PUT(request: NextRequest) {
         verification: {
           id: verification.id,
           status: verification.status
-        }
+        },
+        message: "Your document was received. An administrator will review it shortly."
       });
 
       return setSecurityHeaders(response);

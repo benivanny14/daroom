@@ -12,6 +12,13 @@ const credentials = z.object({
   password: z.string().min(1).max(128)
 });
 
+/**
+ * Compared when no account matches, so a request for an unknown address costs
+ * the same bcrypt work as a request for a real one. Without it, response time
+ * reveals which addresses are registered.
+ */
+const DUMMY_PASSWORD_HASH = "$2a$12$2bL4XiQdXv7S44w6S0TlVecS8JhNNWocwekuQvvP2/SNuWiVG7IRS";
+
 export async function POST(request: NextRequest) {
   try {
     assertSameOrigin(request);
@@ -38,7 +45,11 @@ export async function POST(request: NextRequest) {
     }
 
     const user = await prisma.user.findUnique({ where: { email: body.data.email.toLowerCase() } });
-    if (!user || !user.isActive || !(await bcrypt.compare(body.data.password, user.passwordHash))) {
+    const passwordMatches = await bcrypt.compare(
+      body.data.password,
+      user?.passwordHash ?? DUMMY_PASSWORD_HASH
+    );
+    if (!user || !user.isActive || !passwordMatches) {
       return NextResponse.json({ error: "Incorrect email or password." }, { status: 401 });
     }
     if (!user.isEmailVerified && emailConfigured()) {

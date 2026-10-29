@@ -17,6 +17,8 @@ const CONTENT_SECURITY_POLICY = [
 /** @type {import('next').NextConfig} */
 const nextConfig = (phase) => ({
   reactStrictMode: true,
+  // Do not advertise the framework version to the public.
+  poweredByHeader: false,
   distDir: phase === PHASE_DEVELOPMENT_SERVER ? ".next-dev" : ".next",
   async headers() {
     return [
