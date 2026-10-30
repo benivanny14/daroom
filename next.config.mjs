@@ -1,5 +1,24 @@
 import { PHASE_DEVELOPMENT_SERVER } from "next/constants.js";
 
+/**
+ * Browsers upload media straight to object storage with a signed or presigned
+ * URL, so that storage origin has to be named in `connect-src`. The values come
+ * from the same variables `lib/storage.ts` uses, at build time.
+ */
+function uploadOrigins() {
+  const origins = new Set();
+  for (const value of [process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.S3_ENDPOINT]) {
+    if (!value) continue;
+    try {
+      const { origin } = new URL(value);
+      if (origin.startsWith("https://")) origins.add(origin);
+    } catch {
+      // A malformed value must not produce an invalid policy header.
+    }
+  }
+  return [...origins];
+}
+
 const CONTENT_SECURITY_POLICY = [
   "default-src 'self'",
   "base-uri 'self'",
@@ -10,7 +29,7 @@ const CONTENT_SECURITY_POLICY = [
   "font-src 'self' data:",
   "style-src 'self' 'unsafe-inline'",
   "script-src 'self' 'unsafe-inline'",
-  "connect-src 'self'",
+  `connect-src ${["'self'", ...uploadOrigins()].join(" ")}`,
   "media-src 'self'"
 ].join("; ");
 
