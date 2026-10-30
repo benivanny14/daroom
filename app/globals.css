@@ -446,6 +446,21 @@ img { max-width: 100%; }
 .dashboard { display: grid; grid-template-columns: minmax(280px, .85fr) minmax(0, 1.4fr); align-items: start; gap: 20px; padding: 30px 0 65px; }
 .panel { min-width: 0; padding: 24px; border: 1px solid var(--line-strong); background: var(--surface); }
 .panel h2 { margin: 0 0 12px; font-size: 25px; line-height: 1.2; }
+/* Legal and FAQ pages drop a bare h1 into a panel; without this it inherits
+   the body size and stops reading as a page title. */
+.panel h1, .legal-page h1 {
+  margin: 10px 0 8px;
+  font-family: var(--font-display), "Fraunces", Georgia, serif;
+  font-size: clamp(26px, 5.6vw, 34px);
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: -.018em;
+}
+/* Long-form pages keep the panel's own padding so a phone keeps its width. */
+.legal-page { padding: clamp(18px, 5vw, 30px); }
+.legal-page > section h2 { font-size: clamp(19px, 4.6vw, 25px); }
+.legal-page summary { font-size: 15px; line-height: 1.45; }
+.legal-page p, .legal-page li { font-size: 14.5px; line-height: 1.7; }
 .panel p { color: var(--muted); font-size: 14px; line-height: 1.6; overflow-wrap: anywhere; }
 .subscription-panel { align-self: start; }
 .dashboard-actions { display: flex; align-items: center; justify-content: space-between; gap: 20px; border-left: 4px solid var(--rust); }
@@ -728,6 +743,14 @@ article.panel ul { padding-left: 22px; color: var(--muted); font-size: 14px; lin
   .listing-gallery-full .listing-gallery-stage { height: min(62vw, 340px); min-height: 230px; }
   .footer-inner { align-items: flex-start; flex-direction: column; }
 }
+@media (max-width: 560px) {
+  /* A phone masthead fits two destinations plus the theme switch; the search
+     card is the first thing below it, so the scroll anchor is dropped first. */
+  .nav-links > a:first-child { display: none; }
+  .nav-links { gap: 8px; font-size: 9.5px; letter-spacing: .07em; }
+  .nav-account { padding: 7px 9px; }
+}
+
 @media (max-width: 520px) {
   .shell, .topbar-inner { width: calc(100% - 28px); }
   .topbar-inner { gap: 8px; }
@@ -766,6 +789,11 @@ article.panel ul { padding-left: 22px; color: var(--muted); font-size: 14px; lin
   .my-listing-heading { flex-direction: column; }
   .form-two { grid-template-columns: 1fr; gap: 8px; }
   .admin-tabs button { padding-inline: 11px; }
+  /* A phone should read the queue, not push it sideways: the columns wrap
+     instead of forcing a horizontal scroll inside the panel. */
+  .admin-table { min-width: 0; font-size: 12px; }
+  .admin-table th, .admin-table td { padding: 10px 6px; }
+  .admin-table th { font-size: 9px; letter-spacing: .04em; }
   .modal { padding: 21px; }
   .footer-links { gap: 9px 15px; }
 }
@@ -773,7 +801,10 @@ article.panel ul { padding-left: 22px; color: var(--muted); font-size: 14px; lin
   .shell, .topbar-inner { width: calc(100% - 22px); }
   .brand { font-size: 17px; }
   .nav-links { gap: 6px; font-size: 10px; }
-  .main-nav-links > a:nth-child(2) { display: none; }
+  .nav-links { gap: 5px; font-size: 9px; letter-spacing: .04em; }
+  .nav-account { padding: 6px 7px; }
+  .brand-mark { width: 30px; height: 30px; font-size: 17px; }
+  .account-topbar > a:not(.brand) { font-size: 9.5px; }
   .listing { grid-template-columns: 100px minmax(0, 1fr); }
   .listing-body { padding: 11px 9px; }
   .listing-title { font-size: 15px; }

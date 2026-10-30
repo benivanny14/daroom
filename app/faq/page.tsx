@@ -12,7 +12,7 @@ export default function FAQPage() {
         </div>
       </header>
       <main className="shell" style={{ padding: "40px 0" }}>
-        <article className="panel" style={{ padding: "30px" }}>
+        <article className="panel legal-page">
           <span className="eyebrow">Frequently Asked Questions</span>
           <h1>FAQ - Questions and Answers</h1>
 

@@ -12,7 +12,7 @@ export default function PrivacyPage() {
         </div>
       </header>
       <main className="shell" style={{ padding: "40px 0" }}>
-        <article className="panel" style={{ padding: "30px" }}>
+        <article className="panel legal-page">
           <span className="eyebrow">Privacy Policy</span>
           <h1>DarRoom Privacy Policy</h1>
 
