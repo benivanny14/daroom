@@ -1,5 +1,13 @@
 {
   "buildCommand": "prisma generate && prisma migrate deploy && next build",
+  "redirects": [
+    {
+      "source": "/(.*)",
+      "has": [{ "type": "host", "value": "www.darroom.site" }],
+      "destination": "https://darroom.site/$1",
+      "permanent": true
+    }
+  ],
   "crons": [
     { "path": "/api/cron/auto-expiry", "schedule": "0 5 * * *" },
     { "path": "/api/cron/subscriptions", "schedule": "0 6 * * *" }

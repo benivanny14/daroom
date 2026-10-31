@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 const BASE_PATHS = ["", "/dalali", "/account", "/faq", "/privacy", "/terms"];
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const baseUrl = process.env.APP_URL || "https://darroom.co.tz";
+  const baseUrl = process.env.APP_URL || "https://darroom.site";
   const now = new Date();
 
   const staticEntries: MetadataRoute.Sitemap = BASE_PATHS.map((path) => ({

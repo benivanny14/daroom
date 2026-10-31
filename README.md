@@ -100,7 +100,7 @@ No code change is needed.
 > **Resend sandbox sender:** `onboarding@resend.dev` only delivers to the Resend
 > account owner. It is treated as “not configured” so registration stays open
 > for everyone. Verify a domain at resend.com/domains, then set `EMAIL_FROM` to
-> an address on that domain (for example `DarRoom <no-reply@darroom.co.tz>`).
+> an address on that domain (for example `DarRoom <no-reply@darroom.site>`).
 
 ### Phone privacy and reports
 

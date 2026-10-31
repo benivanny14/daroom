@@ -30,7 +30,7 @@ export const metadata: Metadata = {
     description: "Find rooms to rent in Dar es Salaam. Clear prices and terms.",
     type: "website",
     locale: "en_TZ",
-    url: process.env.APP_URL || "https://darroom.co.tz",
+    url: process.env.APP_URL || "https://darroom.site",
     siteName: "DarRoom"
   },
   twitter: {
@@ -62,7 +62,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${displayFont.variable} ${bodyFont.variable}`}>
       <head>
-        <link rel="canonical" href={process.env.APP_URL || "https://darroom.co.tz"} />
+        <link rel="canonical" href={process.env.APP_URL || "https://darroom.site"} />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </head>
       <body>{children}</body>

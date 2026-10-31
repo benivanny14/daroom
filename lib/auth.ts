@@ -109,15 +109,37 @@ export function clearSessionCookie(response: NextResponse): void {
   });
 }
 
+/**
+ * Rejects a state-changing request whose `Origin` is not this deployment.
+ * Two hosts are trusted: the request's own host (the custom domain or the
+ * `*.vercel.app` alias the browser used) and `APP_URL`, so switching domains
+ * does not break forms that were opened on the other one.
+ */
 export function assertSameOrigin(request: NextRequest): void {
   const origin = request.headers.get("origin");
   if (!origin) return;
 
-  const expected = process.env.APP_URL;
-  if (expected && new URL(origin).origin !== new URL(expected).origin) {
+  let originHost: string;
+  try {
+    originHost = new URL(origin).host;
+  } catch {
     throw new AuthError("This request was rejected.", 403);
   }
-  if (!expected && new URL(origin).host !== request.headers.get("host")) {
+
+  const allowed = new Set<string>();
+  const requestHost = request.headers.get("x-forwarded-host") || request.headers.get("host");
+  if (requestHost) allowed.add(requestHost.split(",")[0].trim());
+
+  const appUrl = process.env.APP_URL;
+  if (appUrl) {
+    try {
+      allowed.add(new URL(appUrl).host);
+    } catch {
+      // A malformed APP_URL must not make every POST fail.
+    }
+  }
+
+  if (!allowed.has(originHost)) {
     throw new AuthError("This request was rejected.", 403);
   }
 }

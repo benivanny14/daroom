@@ -98,7 +98,7 @@ describe("plan rules", () => {
     expect(AGENT_PLAN).toBe(SUBSCRIPTION_PLANS.BASIC);
     expect(AGENT_PLAN.priceTzs).toBe(5000);
     expect(AGENT_PLAN.durationDays).toBe(30);
-    expect(AGENT_PLAN.featuredSlots).toBe(0);
+    expect(AGENT_PLAN.featuredSlots).toBe(1);
   });
 
   it("keeps the legacy plan definitions for existing subscriptions", () => {
@@ -106,8 +106,9 @@ describe("plan rules", () => {
     expect(SUBSCRIPTION_PLANS.FEATURED.priceTzs).toBe(30000);
   });
 
-  it("gives featured slots only to the legacy paid plans", () => {
-    expect(hasFeaturedSlots(0, "BASIC")).toBe(false);
+  it("gives the paid plan one featured slot and the legacy plans theirs", () => {
+    expect(hasFeaturedSlots(0, "BASIC")).toBe(true);
+    expect(hasFeaturedSlots(1, "BASIC")).toBe(false);
     expect(hasFeaturedSlots(0, "PREMIUM")).toBe(true);
     expect(hasFeaturedSlots(2, "PREMIUM")).toBe(false);
     expect(hasFeaturedSlots(5, "FEATURED")).toBe(false);

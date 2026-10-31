@@ -99,7 +99,7 @@ export default function PrivacyPage() {
 
           <section style={{ marginTop: "30px" }}>
             <h2>9. Contact</h2>
-            <p>For privacy questions, contact us: privacy@darroom.co.tz</p>
+            <p>For privacy questions, contact us: privacy@darroom.site</p>
           </section>
 
           <footer style={{ marginTop: "40px", paddingTop: "20px", borderTop: "1px solid var(--line)" }}>

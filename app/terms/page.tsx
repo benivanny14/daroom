@@ -72,7 +72,7 @@ export default function TermsPage() {
 
           <section style={{ marginTop: "30px" }}>
             <h2>8. Contact</h2>
-            <p>For any questions, contact us by email: accounts@darroom.co.tz</p>
+            <p>For any questions, contact us by email: accounts@darroom.site</p>
           </section>
 
           <footer style={{ marginTop: "40px", paddingTop: "20px", borderTop: "1px solid var(--line)" }}>
