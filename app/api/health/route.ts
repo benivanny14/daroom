@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { emailConfigured } from "@/lib/email";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -28,7 +29,9 @@ export async function GET() {
       database,
       storage: process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SECRET_KEY ? "ok" : "not_configured",
       payments: process.env.SONICPESA_ACCESS_KEY && process.env.SONICPESA_SECRET_KEY ? "ok" : "not_configured",
-      email: process.env.RESEND_API_KEY ? "ok" : "not_configured"
+      // "sandbox" means EMAIL_FROM is still Resend's shared onboarding address,
+      // which can only deliver to the Resend account owner.
+      email: !process.env.RESEND_API_KEY ? "not_configured" : emailConfigured() ? "ok" : "sandbox"
     },
     latencyMs: Date.now() - startedAt
   };
