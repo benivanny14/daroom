@@ -108,8 +108,6 @@ export async function GET(request: NextRequest) {
         toiletMode: true,
         isFeatured: true,
         isAvailable: true,
-        latitude: true,
-        longitude: true,
         photos: { select: { id: true, storageKey: true, altText: true }, orderBy: { createdAt: "asc" }, take: 6 }
       },
       orderBy,
@@ -165,8 +163,6 @@ export async function GET(request: NextRequest) {
         toiletMode: listing.toiletMode,
         isFeatured: listing.isFeatured,
         isAvailable: listing.isAvailable,
-        latitude: listing.latitude,
-        longitude: listing.longitude,
         featured: listing.isFeatured,
         imageTone: "one" as const,
         ratingAverage: ratings.get(listing.id)?.average ?? null,

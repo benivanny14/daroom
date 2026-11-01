@@ -86,8 +86,6 @@ export async function getListingDetail(id: string): Promise<ListingDetailData | 
     featured: listing.isFeatured,
     imageTone: "one",
     isAvailable: listing.isAvailable,
-    latitude: listing.latitude,
-    longitude: listing.longitude,
     createdAt: listing.createdAt.toISOString(),
     ownerId: listing.owner.id,
     dalali: {

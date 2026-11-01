@@ -27,9 +27,7 @@ const listingUpdate = z.object({
   electricityMode: z.enum(["INDEPENDENT", "SHARED"]).optional(),
   hasWifi: z.boolean().optional(),
   toiletMode: z.enum(["PRIVATE", "SHARED"]).optional(),
-  isAvailable: z.boolean().optional(),
-  latitude: z.number().min(-90).max(90).nullable().optional(),
-  longitude: z.number().min(-180).max(180).nullable().optional()
+  isAvailable: z.boolean().optional()
 });
 
 const availabilityToggle = z.object({
@@ -113,8 +111,6 @@ export async function PATCH(
           ...(input.data.hasWifi !== undefined ? { hasWifi: input.data.hasWifi } : {}),
           ...(input.data.toiletMode !== undefined ? { toiletMode: input.data.toiletMode } : {}),
           ...(input.data.isAvailable !== undefined ? { isAvailable: input.data.isAvailable } : {}),
-          ...(input.data.latitude !== undefined ? { latitude: input.data.latitude } : {}),
-          ...(input.data.longitude !== undefined ? { longitude: input.data.longitude } : {}),
           inspectionFeePolicyAcceptedAt: new Date(),
           expiresAt: listingExpiryFrom(),
           rejectionReason: null

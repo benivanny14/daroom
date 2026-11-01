@@ -30,8 +30,6 @@ export type Listing = {
   toiletMode?: "PRIVATE" | "SHARED";
   isFeatured: boolean;
   isAvailable?: boolean;
-  latitude?: number | null;
-  longitude?: number | null;
   ratingAverage?: number | null;
   reviewCount?: number;
 };

@@ -156,8 +156,6 @@ model Listing {
   hasWifi        Boolean        @default(false)
   /// Private toilet inside the room, or one shared with other tenants.
   toiletMode     ToiletMode     @default(SHARED)
-  latitude       Float?
-  longitude      Float?
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
   owner          User           @relation(fields: [ownerId], references: [id], onDelete: Cascade)

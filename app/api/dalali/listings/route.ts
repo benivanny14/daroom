@@ -31,9 +31,7 @@ const listingInput = z.object({
   electricityMode: z.enum(["INDEPENDENT", "SHARED"]).optional().default("SHARED"),
   hasWifi: z.boolean().optional().default(false),
   toiletMode: z.enum(["PRIVATE", "SHARED"]).optional().default("SHARED"),
-  isAvailable: z.boolean().optional().default(true),
-  latitude: z.number().min(-90).max(90).nullable().optional(),
-  longitude: z.number().min(-180).max(180).nullable().optional()
+  isAvailable: z.boolean().optional().default(true)
 });
 
 export async function GET() {
@@ -151,8 +149,6 @@ export async function POST(request: NextRequest) {
           hasWifi: input.data.hasWifi,
           toiletMode: input.data.toiletMode,
           isAvailable: input.data.isAvailable,
-          latitude: input.data.latitude ?? null,
-          longitude: input.data.longitude ?? null,
           inspectionFeePolicyAcceptedAt: new Date(),
           expiresAt: listingExpiryFrom(),
           status: "APPROVED"

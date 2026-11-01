@@ -91,9 +91,6 @@ export default async function ListingPage({
       addressRegion: listing.district,
       addressCountry: "TZ"
     },
-    ...(listing.latitude !== null && listing.longitude !== null
-      ? { geo: { "@type": "GeoCoordinates", latitude: listing.latitude, longitude: listing.longitude } }
-      : {}),
     offers: {
       "@type": "Offer",
       price: listing.priceTzs,
@@ -129,6 +126,7 @@ export default async function ListingPage({
           </Link>
           <nav className="nav-links">
             <Link href="/">All rooms</Link>
+            <Link href="/rooms">Areas</Link>
             <Link href="/dalali">For Agents</Link>
             <DarkModeToggle />
           </nav>
@@ -140,7 +138,7 @@ export default async function ListingPage({
       <footer className="site-footer">
         <div className="shell footer-inner">
           <p>&copy; 2026 DarRoom &middot; Dar es Salaam, Tanzania</p>
-          <span>Tenants pay no fee to search or view a room.</span>
+          <Link href="/rooms">Browse rooms by area</Link>
         </div>
       </footer>
     </>

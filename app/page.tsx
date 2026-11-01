@@ -26,6 +26,7 @@ export default async function HomePage() {
           </Link>
           <nav className="nav-links main-nav-links" aria-label="Main navigation">
             <a href="#listings">Find a room</a>
+            <Link href="/rooms">Areas</Link>
             <Link href="/dalali">For Agents</Link>
             <Link href="/account" className="nav-account">Account</Link>
             <DarkModeToggle />
@@ -40,6 +41,7 @@ export default async function HomePage() {
           <p>© 2026 DarRoom · Dar es Salaam, Tanzania</p>
           <div className="footer-links">
             <span>Tenants pay no search fee.</span>
+            <Link href="/rooms">Browse by area</Link>
             <Link href="/dalali">Post a listing</Link>
             <Link href="/terms">Terms</Link>
             <Link href="/privacy">Privacy</Link>

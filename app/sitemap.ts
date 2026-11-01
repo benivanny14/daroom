@@ -1,9 +1,10 @@
 import type { MetadataRoute } from "next";
+import { getAreas } from "@/lib/areas";
 import { notExpiredFilter } from "@/lib/listing-policy";
 import { prisma } from "@/lib/prisma";
 import { SITE_URL } from "@/lib/site";
 
-const BASE_PATHS = ["", "/dalali", "/account", "/faq", "/privacy", "/terms", "/contact"];
+const BASE_PATHS = ["", "/rooms", "/dalali", "/account", "/faq", "/privacy", "/terms", "/contact"];
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date();
@@ -31,8 +32,26 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // The sitemap must still render when the database is unreachable.
   }
 
+  let areaEntries: MetadataRoute.Sitemap = [];
+  try {
+    // Only areas that actually hold rooms are worth indexing; an empty area page
+    // is marked noindex on the page itself.
+    const areas = await getAreas();
+    areaEntries = areas
+      .filter((area) => area.listings > 0)
+      .map((area) => ({
+        url: `${SITE_URL}/rooms/${area.slug}`,
+        lastModified: now,
+        changeFrequency: "daily" as const,
+        priority: area.type === "district" ? 0.8 : 0.7
+      }));
+  } catch {
+    // A sitemap without area pages is still better than a failed request.
+  }
+
   return [
     ...staticEntries,
+    ...areaEntries,
     ...listings.map((listing) => ({
       url: `${SITE_URL}/listing/${listing.id}`,
       lastModified: listing.updatedAt,

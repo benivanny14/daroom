@@ -36,8 +36,6 @@ export type ListingDetailData = {
   featured: boolean;
   imageTone: "one" | "two" | "three";
   isAvailable: boolean;
-  latitude: number | null;
-  longitude: number | null;
   createdAt: string;
   ownerId: string;
   dalali: {
