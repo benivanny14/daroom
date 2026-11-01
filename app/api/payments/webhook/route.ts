@@ -1,4 +1,3 @@
-import { Prisma } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
@@ -37,79 +36,6 @@ function paymentStateFor(event: WebhookEvent) {
   if (eventName === "payment.failed") return "FAILED" as const;
   if (eventName === "payment.cancelled" || eventName === "payment.canceled") return "CANCELLED" as const;
   return mapSonicPesaStatus(event.payment_status || event.status);
-}
-
-/** Tenant rent payment: update the `RentPayment` row. */
-async function handleRentPayment(
-  event: WebhookEvent,
-  payload: unknown,
-  payment: {
-    id: string;
-    status: string;
-    amountTzs: number;
-    providerTransId: string | null;
-    providerReference: string | null;
-    channel: string | null;
-    paidAt: Date | null;
-  }
-) {
-  if (payment.status === "PAID") {
-    return acknowledged({ ignored: "already_paid" });
-  }
-
-  const state = paymentStateFor(event);
-
-  if (state === "PAID") {
-    const paidAmount = Number(event.amount);
-    if (!Number.isFinite(paidAmount) || Math.round(paidAmount) !== payment.amountTzs) {
-      console.error("SonicPesa amount mismatch", {
-        orderId: event.order_id,
-        expected: payment.amountTzs,
-        received: event.amount
-      });
-      await prisma.rentPayment.update({
-        where: { id: payment.id },
-        data: {
-          status: "FAILED",
-          failureReason: "The amount confirmed by SonicPesa did not match the expected rent amount.",
-          rawPayload: payload as Prisma.InputJsonValue
-        }
-      });
-      return acknowledged({ ignored: "amount_mismatch" });
-    }
-  }
-
-  let transId = event.transid?.trim() || null;
-  if (transId) {
-    const duplicate = await prisma.rentPayment.findFirst({
-      where: { providerTransId: transId, NOT: { id: payment.id } },
-      select: { id: true }
-    });
-    if (duplicate) {
-      console.error("SonicPesa transaction id already used by another payment", { transId });
-      transId = null;
-    }
-  }
-
-  await prisma.rentPayment.update({
-    where: { id: payment.id },
-    data: {
-      status: state,
-      providerTransId: transId || payment.providerTransId,
-      providerReference: event.reference || payment.providerReference,
-      channel: event.channel || payment.channel,
-      failureReason:
-        state === "FAILED"
-          ? "The provider reported a failed payment."
-          : state === "CANCELLED"
-            ? "The payment was cancelled."
-            : null,
-      paidAt: state === "PAID" ? new Date() : payment.paidAt,
-      rawPayload: payload as Prisma.InputJsonValue
-    }
-  });
-
-  return acknowledged();
 }
 
 /** Agent subscription payment: verify the TSh 5,000 and activate the period. */
@@ -163,9 +89,11 @@ async function handleSubscriptionPayment(
 }
 
 /**
- * SonicPesa webhook for both rent and subscription payments. The request is
- * authenticated by the HMAC signature over the exact raw body, so it is exempt
- * from the browser same-origin check in `middleware.ts`.
+ * SonicPesa webhook for the agent subscription. Rent is paid directly to the
+ * Agent on WhatsApp, so this application only ever verifies subscription
+ * payments. The request is authenticated by the HMAC signature over the exact
+ * raw body, so it is exempt from the browser same-origin check in
+ * `middleware.ts`.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -197,20 +125,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid webhook payload." }, { status: 400 });
     }
     const event = parsed.data;
-
-    const rentPayment = await prisma.rentPayment.findUnique({
-      where: { providerOrderId: event.order_id },
-      select: {
-        id: true,
-        status: true,
-        amountTzs: true,
-        providerTransId: true,
-        providerReference: true,
-        channel: true,
-        paidAt: true
-      }
-    });
-    if (rentPayment) return handleRentPayment(event, payload, rentPayment);
 
     const subscriptionPayment = await prisma.paymentEvent.findUnique({
       where: { providerOrderId: event.order_id },

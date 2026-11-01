@@ -3,6 +3,7 @@
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { AGENT_PLAN, AGENT_PLAN_ID, SUBSCRIPTION_PLANS, photoLimitForPlan } from "@/lib/subscriptions-plans";
+import { compressImage } from "@/lib/image-compress";
 
 type District = { id: string; name: string; neighborhoods: { id: string; name: string }[] };
 type Photo = { id: string; url?: string | null; altText: string };
@@ -25,6 +26,9 @@ type Listing = {
   furnished: boolean;
   allowsPets: boolean;
   allowsStudents: boolean;
+  electricityMode?: "INDEPENDENT" | "SHARED";
+  hasWifi?: boolean;
+  toiletMode?: "PRIVATE" | "SHARED";
   isAvailable: boolean;
   expiresAt?: string | null;
   isFeatured?: boolean;
@@ -40,7 +44,7 @@ type Appointment = {
   listing: { id: string; title: string };
 };
 
-type User = { id: string; name: string; email: string; phone: string };
+type User = { id: string; name: string; email: string; phone: string; freeAccess?: boolean };
 type Subscription = { active: boolean; endsAt: string; plan: string } | null;
 type SubscriptionPayment = {
   id: string;
@@ -75,6 +79,9 @@ type FormValues = {
   furnished: boolean;
   allowsPets: boolean;
   allowsStudents: boolean;
+  electricityMode: "INDEPENDENT" | "SHARED";
+  hasWifi: boolean;
+  toiletMode: "PRIVATE" | "SHARED";
 };
 
 const MAX_PHOTO_BYTES = 15 * 1024 * 1024;
@@ -107,7 +114,10 @@ const emptyForm: FormValues = {
   bathrooms: "1",
   furnished: false,
   allowsPets: false,
-  allowsStudents: true
+  allowsStudents: true,
+  electricityMode: "SHARED",
+  hasWifi: false,
+  toiletMode: "SHARED"
 };
 
 const filterLabels: Record<ListingFilter, string> = {
@@ -170,6 +180,7 @@ export function DalaliDashboard({
   const [loading, setLoading] = useState(true);
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [formPhotos, setFormPhotos] = useState<{ file: File; url: string }[]>([]);
+  const [freeAccess, setFreeAccess] = useState(Boolean(user.freeAccess));
 
   const load = useCallback(async () => {
     setError("");
@@ -187,6 +198,7 @@ export function DalaliDashboard({
     }
     setListings(listingBody.listings);
     setSubscription(listingBody.subscription);
+    setFreeAccess(Boolean(listingBody.freeAccess));
     setAppointments(Array.isArray(listingBody.appointments) ? listingBody.appointments : []);
     setDistricts(geographyBody.region.districts);
     if (analyticsResponse.ok) {
@@ -200,7 +212,23 @@ export function DalaliDashboard({
       .finally(() => setLoading(false));
   }, [load]);
 
-  const active = Boolean(subscription?.active);
+  // If a SonicPesa webhook was delayed, ask the provider once and refresh.
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/payments/subscription/checkout?reconcile=1", { cache: "no-store" })
+      .then(async (response) => (response.ok ? response.json() : null))
+      .then((body) => {
+        if (!cancelled && body && Number(body.reconciled) > 0) void load();
+      })
+      .catch(() => {
+        // A failed sweep must never block the dashboard.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [load]);
+
+  const active = Boolean(subscription?.active) || freeAccess;
   const selectedDistrict = districts.find((district) => district.name === form.district);
   const counts = {
     all: listings.length,
@@ -227,24 +255,29 @@ export function DalaliDashboard({
     setCreating(true);
   }, [user.phone]);
 
-  function addFormPhotos(files: File[], existingCount: number) {
+  async function addFormPhotos(files: File[], existingCount: number) {
     setError("");
     setMessage("");
     const accepted: { file: File; url: string }[] = [];
     const problems: string[] = [];
-    for (const file of files) {
-      if (!MAX_PHOTO_TYPES.includes(file.type)) {
-        problems.push(`${file.name}: use a JPEG, PNG or WebP photo.`);
+    for (const original of files) {
+      if (original.type.startsWith("video/")) {
+        problems.push(`${original.name}: videos are not allowed. Upload photos only.`);
         continue;
       }
-      if (file.size > MAX_PHOTO_BYTES) {
-        problems.push(`${file.name}: must not exceed 15 MB.`);
+      if (!MAX_PHOTO_TYPES.includes(original.type)) {
+        problems.push(`${original.name}: use a JPEG, PNG or WebP photo.`);
+        continue;
+      }
+      if (original.size > MAX_PHOTO_BYTES) {
+        problems.push(`${original.name}: must not exceed 15 MB.`);
         continue;
       }
       if (existingCount + formPhotos.length + accepted.length >= photoLimit) {
-        problems.push(`${file.name}: skipped, a listing can have at most ${photoLimit} photos.`);
+        problems.push(`${original.name}: skipped, a listing can have at most ${photoLimit} photos.`);
         continue;
       }
+      const file = await compressImage(original);
       accepted.push({ file, url: URL.createObjectURL(file) });
     }
     if (accepted.length) setFormPhotos((current) => [...current, ...accepted]);
@@ -460,7 +493,10 @@ export function DalaliDashboard({
       bathrooms: String(listing.bathrooms || 1),
       furnished: listing.furnished,
       allowsPets: listing.allowsPets,
-      allowsStudents: listing.allowsStudents
+      allowsStudents: listing.allowsStudents,
+      electricityMode: listing.electricityMode ?? "SHARED",
+      hasWifi: listing.hasWifi ?? false,
+      toiletMode: listing.toiletMode ?? "SHARED"
     });
   }
 
@@ -605,17 +641,22 @@ export function DalaliDashboard({
 
     try {
       for (let position = 0; position < accepted.length; position += 1) {
-        const file = accepted[position];
+        const original = accepted[position];
+        if (original.type.startsWith("video/")) {
+          failures.push(`${original.name}: videos are not allowed. Upload photos only.`);
+          continue;
+        }
         setMessage(
           accepted.length > 1
             ? `Uploading photo ${position + 1} of ${accepted.length}...`
             : "Uploading photo..."
         );
         try {
+          const file = await compressImage(original);
           await uploadPhoto(listingId, file, describePhoto(file, existingCount + position + 1));
           uploaded += 1;
         } catch (caught) {
-          failures.push(`${file.name}: ${caught instanceof Error ? caught.message : "upload failed."}`);
+          failures.push(`${original.name}: ${caught instanceof Error ? caught.message : "upload failed."}`);
         }
       }
 
@@ -770,13 +811,22 @@ export function DalaliDashboard({
           {AGENT_PLAN.maxListings} listings · {AGENT_PLAN.maxPhotosPerListing} photos per listing · {agentPlanDuration}.
         </p>
         <p>Payments are for Agents only. Tenants do not pay rent, deposits, or fees inside DarRoom.</p>
-        <button className="wide-button" onClick={startCheckout} disabled={paying}>
-          {paying ? "Sending prompt..." : `Pay TSh ${agentPlanPrice}`}
-        </button>
-        <p className="fine-print">
-          Pay with M-Pesa, Tigo Pesa, Airtel Money or Halopesa. SonicPesa sends a prompt to{" "}
-          {user.phone}; approve it with your mobile-money PIN. DarRoom never asks for your PIN.
-        </p>
+        {freeAccess ? (
+          <p className="notice" role="status">
+            <strong>Free access:</strong> DarRoom has granted this account free listing and photo
+            uploads. No subscription payment is needed while this is on.
+          </p>
+        ) : (
+          <>
+            <button className="wide-button" onClick={startCheckout} disabled={paying}>
+              {paying ? "Sending prompt..." : `Pay TSh ${agentPlanPrice}`}
+            </button>
+            <p className="fine-print">
+              Pay with M-Pesa, Tigo Pesa, Airtel Money or Halopesa. SonicPesa sends a prompt to{" "}
+              {user.phone}; approve it with your mobile-money PIN. DarRoom never asks for your PIN.
+            </p>
+          </>
+        )}
         {payment && (
           <div className="status-row">
             <div>
@@ -953,6 +1003,35 @@ export function DalaliDashboard({
               <div><label htmlFor="listing-bathrooms">Bathrooms</label><input id="listing-bathrooms" type="number" min={1} max={5} value={form.bathrooms} required onChange={(event) => setForm({ ...form, bathrooms: event.target.value })} /></div>
             </div>
             <label className="checkbox-row"><input type="checkbox" checked={form.luku} onChange={(event) => setForm({ ...form, luku: event.target.checked })} /> Prepaid electricity included in the room</label>
+            <div className="form-two">
+              <div>
+                <label htmlFor="listing-electricity">Electricity arrangement</label>
+                <select
+                  id="listing-electricity"
+                  value={form.electricityMode}
+                  onChange={(event) =>
+                    setForm({ ...form, electricityMode: event.target.value as FormValues["electricityMode"] })
+                  }
+                >
+                  <option value="SHARED">Shared bill — tenants contribute</option>
+                  <option value="INDEPENDENT">Own meter — each tenant pays their own</option>
+                </select>
+              </div>
+              <div>
+                <label htmlFor="listing-toilet">Toilet</label>
+                <select
+                  id="listing-toilet"
+                  value={form.toiletMode}
+                  onChange={(event) =>
+                    setForm({ ...form, toiletMode: event.target.value as FormValues["toiletMode"] })
+                  }
+                >
+                  <option value="SHARED">Shared toilet</option>
+                  <option value="PRIVATE">Private toilet in the room</option>
+                </select>
+              </div>
+            </div>
+            <label className="checkbox-row"><input type="checkbox" checked={form.hasWifi} onChange={(event) => setForm({ ...form, hasWifi: event.target.checked })} /> Wi-Fi available</label>
             <label className="checkbox-row"><input type="checkbox" checked={form.furnished} onChange={(event) => setForm({ ...form, furnished: event.target.checked })} /> Room is furnished</label>
             <label className="checkbox-row"><input type="checkbox" checked={form.allowsPets} onChange={(event) => setForm({ ...form, allowsPets: event.target.checked })} /> Allows pets</label>
             <label className="checkbox-row"><input type="checkbox" checked={form.allowsStudents} onChange={(event) => setForm({ ...form, allowsStudents: event.target.checked })} /> Allows students</label>
@@ -962,7 +1041,8 @@ export function DalaliDashboard({
               <legend>Photos</legend>
               <p className="fine-print">
                 Add up to {photoLimit} photos, 15 MB each (JPEG, PNG or WebP). The first
-                photo is the cover and tenants can browse the rest as a slideshow.
+                photo is the cover and tenants can browse the rest as a slideshow. Photos only —
+                videos are not accepted.
               </p>
 
               {editingListing && editingListing.photos.length > 0 && (
@@ -1020,7 +1100,7 @@ export function DalaliDashboard({
                   disabled={!active || busy || (editingListing?.photos.length ?? 0) + formPhotos.length >= photoLimit}
                   onChange={(event) => {
                     const files = Array.from(event.target.files ?? []);
-                    if (files.length) addFormPhotos(files, editingListing?.photos.length ?? 0);
+                    if (files.length) void addFormPhotos(files, editingListing?.photos.length ?? 0);
                     event.currentTarget.value = "";
                   }}
                 />
@@ -1091,13 +1171,17 @@ export function DalaliDashboard({
               </div>
               <p className="fine-print">
                 Select several photos at once. Up to {photoLimit} photos per listing, 15 MB each
-                (JPEG, PNG, or WebP). The first photo is used as the cover, and tenants can browse the rest as a slideshow.
+                (JPEG, PNG, or WebP). Photos only — videos are not accepted. The first photo is used
+                as the cover, and tenants can browse the rest as a slideshow.
               </p>
               <div className="listing-details">
                 <span>Bedrooms: {listing.bedrooms || "N/A"}</span>
                 <span>Bathrooms: {listing.bathrooms || "N/A"}</span>
                 <span>{listing.furnished ? "Furnished" : "Unfurnished"}</span>
                 <span>{listing.allowsPets ? "Pets allowed" : "No pets"}</span>
+                <span>{listing.electricityMode === "INDEPENDENT" ? "Own meter" : "Shared electricity"}</span>
+                <span>{listing.hasWifi ? "Wi-Fi" : "No Wi-Fi"}</span>
+                <span>{listing.toiletMode === "PRIVATE" ? "Private toilet" : "Shared toilet"}</span>
                 <span className={listing.isAvailable ? "available-tag" : "unavailable-tag"}>{listing.isAvailable ? "Available" : "Rented"}</span>
               </div>
               <div className="my-listing-actions">

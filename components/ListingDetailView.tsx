@@ -4,19 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ListingPhotos } from "@/components/ListingPhotos";
 import { buildWhatsAppLink } from "@/lib/whatsapp";
-import type { Listing } from "@/lib/listings";
-
-type ListingDetail = Listing & {
-  createdAt: string;
-  dalali: { name: string; isVerified: boolean };
-  reviews: {
-    id: string;
-    userName: string;
-    rating: number;
-    comment: string;
-    createdAt: string;
-  }[];
-};
+import type { ListingDetailData } from "@/lib/listing-types";
 
 function defaultAppointmentSlot() {
   const date = new Date();
@@ -26,9 +14,9 @@ function defaultAppointmentSlot() {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
-export function ListingDetailView({ listingId }: { listingId: string }) {
-  const [listing, setListing] = useState<ListingDetail | null>(null);
-  const [loading, setLoading] = useState(true);
+export function ListingDetailView({ initialListing }: { initialListing: ListingDetailData }) {
+  const listingId = initialListing.id;
+  const [listing, setListing] = useState<ListingDetailData | null>(initialListing);
   const [error, setError] = useState("");
   const [reportOpen, setReportOpen] = useState(false);
   const [reportCategory, setReportCategory] = useState("Listing is not real");
@@ -49,28 +37,10 @@ export function ListingDetailView({ listingId }: { listingId: string }) {
   const [appointmentAt, setAppointmentAt] = useState(defaultAppointmentSlot());
   const [appointmentNotes, setAppointmentNotes] = useState("");
   const [appointmentBusy, setAppointmentBusy] = useState(false);
+  const [shareMessage, setShareMessage] = useState("");
 
-  useEffect(() => {
-    const controller = new AbortController();
-    fetch(`/api/listings/${encodeURIComponent(listingId)}`, {
-      cache: "no-store",
-      signal: controller.signal
-    })
-      .then(async (response) => {
-        const body = await response.json();
-        if (!response.ok) throw new Error(body.error || "Listing not found.");
-        setListing(body.listing);
-      })
-      .catch((caught: unknown) => {
-        if (caught instanceof DOMException && caught.name === "AbortError") return;
-        setError(caught instanceof Error ? caught.message : "Listing unavailable right now.");
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setLoading(false);
-      });
-    return () => controller.abort();
-  }, [listingId]);
-
+  // The room arrives already rendered by the server, so this effect only loads
+  // session-scoped state: who is logged in and whether they saved the room.
   useEffect(() => {
     fetch("/api/auth/me", { cache: "no-store" })
       .then(async (response) => {
@@ -129,6 +99,20 @@ export function ListingDetailView({ listingId }: { listingId: string }) {
       setError(caught instanceof Error ? caught.message : "Favorite was not saved.");
     } finally {
       setFavoriteBusy(false);
+    }
+  }
+
+  async function shareListing() {
+    const url = window.location.href;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: initialListing.title, text: initialListing.title, url });
+        return;
+      }
+      await navigator.clipboard.writeText(url);
+      setShareMessage("Link copied. Send it to a friend.");
+    } catch {
+      setShareMessage("Copy this page's address from your browser to share the room.");
     }
   }
 
@@ -263,9 +247,6 @@ export function ListingDetailView({ listingId }: { listingId: string }) {
     }
   }
 
-  if (loading) {
-    return <div className="shell detail-state" role="status">Loading listing...</div>;
-  }
   if (error && !listing) {
     return (
       <div className="shell detail-state">
@@ -311,6 +292,9 @@ export function ListingDetailView({ listingId }: { listingId: string }) {
             {listing.bedrooms && <span className="term">{listing.bedrooms} {listing.bedrooms === 1 ? "bedroom" : "bedrooms"}</span>}
             {listing.bathrooms && <span className="term">{listing.bathrooms} {listing.bathrooms === 1 ? "bathroom" : "bathrooms"}</span>}
             <span className="term">{listing.luku ? "Electricity included" : "Electricity excluded"}</span>
+            <span className="term">{listing.electricityMode === "INDEPENDENT" ? "Own electricity meter" : "Shared electricity"}</span>
+            <span className="term">{listing.hasWifi ? "Wi-Fi available" : "No Wi-Fi"}</span>
+            <span className="term">{listing.toiletMode === "PRIVATE" ? "Private toilet" : "Shared toilet"}</span>
             <span className="term">{listing.water}</span>
             <span className="term">{listing.furnished ? "Furnished" : "Unfurnished"}</span>
             <span className="term">{listing.allowsStudents ? "Students welcome" : "Not for students"}</span>
@@ -320,6 +304,9 @@ export function ListingDetailView({ listingId }: { listingId: string }) {
           <div className="dalali-card">
             <strong>{listing.dalali.name}</strong>
             {listing.dalali.isVerified && <span className="status live">Account verified</span>}
+            <Link className="dalali-profile-link" href={`/agents/${listing.dalali.id}`}>
+              View all rooms from this Agent
+            </Link>
           </div>
           {listing.isAvailable === false ? (
             <button className="whatsapp detail-whatsapp" type="button" disabled>
@@ -356,11 +343,28 @@ export function ListingDetailView({ listingId }: { listingId: string }) {
             >
               {listing.isAvailable === false ? "Rented" : "Schedule a viewing"}
             </button>
+            <button className="table-action" type="button" onClick={shareListing}>
+              Share room
+            </button>
+          </div>
+          {shareMessage && <p className="fine-print" role="status">{shareMessage}</p>}
+          <div className="detail-rating">
+            {listing.ratingAverage !== null ? (
+              <>
+                <span aria-hidden="true">{"★".repeat(Math.round(listing.ratingAverage))}{"☆".repeat(5 - Math.round(listing.ratingAverage))}</span>
+                <span>
+                  {listing.ratingAverage.toFixed(1)} out of 5 · {listing.reviewCount}{" "}
+                  {listing.reviewCount === 1 ? "review" : "reviews"}
+                </span>
+              </>
+            ) : (
+              <span>No reviews yet</span>
+            )}
           </div>
           <button className="report-button detail-report" onClick={() => setReportOpen(true)}>
             Report this room
           </button>
-          <p className="fine-print">DarRoom does not charge tenants a platform fee. Rent payments are optional and only collected when your agent asks you to use the Pay rent page.</p>
+          <p className="fine-print">DarRoom never collects rent and charges tenants no platform fee. Agree the rent and terms with the Agent, then pay the Agent directly on WhatsApp after your viewing.</p>
         </article>
       </div>
 

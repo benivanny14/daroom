@@ -4,7 +4,7 @@ import { assertSameOrigin, authErrorResponse, requireAgent } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { readJsonBody } from "@/lib/http";
 import { hasListingWriteAccess } from "@/lib/subscriptions";
-import { canUserAddListing } from "@/lib/subscriptions-plans";
+import { canUserAddListing, AGENT_PLAN_ID } from "@/lib/subscriptions-plans";
 import { clientIp, enforceRateLimit } from "@/lib/rate-limit";
 import { findOrCreateNeighborhood } from "@/lib/geography";
 import { getMediaUrl } from "@/lib/storage";
@@ -28,6 +28,9 @@ const listingInput = z.object({
   furnished: z.boolean().optional().default(false),
   allowsPets: z.boolean().optional().default(false),
   allowsStudents: z.boolean().optional().default(true),
+  electricityMode: z.enum(["INDEPENDENT", "SHARED"]).optional().default("SHARED"),
+  hasWifi: z.boolean().optional().default(false),
+  toiletMode: z.enum(["PRIVATE", "SHARED"]).optional().default("SHARED"),
   isAvailable: z.boolean().optional().default(true),
   latitude: z.number().min(-90).max(90).nullable().optional(),
   longitude: z.number().min(-180).max(180).nullable().optional()
@@ -79,6 +82,7 @@ export async function GET() {
             rejectedReason: verification.rejectedReason
           }
         : null,
+      freeAccess: user.freeAccess,
       appointments
     });
   } catch (error) {
@@ -113,10 +117,11 @@ export async function POST(request: NextRequest) {
         where: { userId: user.id },
         orderBy: { endsAt: "desc" }
       });
-      if (!subscription || !hasListingWriteAccess(subscription)) return null;
+      // An admin can grant free access, which bypasses the paid plan.
+      if (!user.freeAccess && !hasListingWriteAccess(subscription)) return null;
       const ownedCount = await tx.listing.count({ where: { ownerId: user.id } });
-      if (!canUserAddListing(ownedCount, subscription.plan)) {
-        throw new ListingInputError(`Your plan (${subscription.plan}) has reached its listing limit. Upgrade your plan to add more.`);
+      if (!canUserAddListing(ownedCount, subscription?.plan ?? AGENT_PLAN_ID)) {
+        throw new ListingInputError("Your plan has reached its listing limit. Remove a listing or contact support to add more.");
       }
 
       const neighborhood = await findOrCreateNeighborhood(
@@ -142,6 +147,9 @@ export async function POST(request: NextRequest) {
           furnished: input.data.furnished,
           allowsPets: input.data.allowsPets,
           allowsStudents: input.data.allowsStudents,
+          electricityMode: input.data.electricityMode,
+          hasWifi: input.data.hasWifi,
+          toiletMode: input.data.toiletMode,
           isAvailable: input.data.isAvailable,
           latitude: input.data.latitude ?? null,
           longitude: input.data.longitude ?? null,

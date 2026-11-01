@@ -43,7 +43,7 @@ export async function POST(
         where: { userId: user.id },
         orderBy: { endsAt: "desc" }
       });
-      if (!hasListingWriteAccess(subscription)) {
+      if (!hasListingWriteAccess(subscription) && !user.freeAccess) {
         return NextResponse.json({ error: "Your subscription has expired. Pay TSh 5,000 before adding photos." }, { status: 403 });
       }
 
@@ -54,12 +54,16 @@ export async function POST(
 
       const rawBody = await readJsonBody(request, 2 * 1024);
       if (!rawBody.ok) return NextResponse.json({ error: "The data is invalid or too large." }, { status: rawBody.status });
+      const declaredType = (rawBody.value as Record<string, unknown> | null)?.contentType;
+      if (typeof declaredType === "string" && declaredType.startsWith("video/")) {
+        return NextResponse.json({ error: "Videos are not allowed. Upload photos only (JPEG, PNG or WebP)." }, { status: 400 });
+      }
       const parsed = z.object({
         contentType: z.enum(["image/jpeg", "image/jpg", "image/png", "image/webp"]),
         size: z.number().int().positive(),
         fileName: z.string().trim().max(255).optional()
       }).safeParse(rawBody.value);
-      if (!parsed.success) return NextResponse.json({ error: "Photo details are invalid." }, { status: 400 });
+      if (!parsed.success) return NextResponse.json({ error: "Photos only: use a JPEG, PNG or WebP image." }, { status: 400 });
       const { contentType, size, fileName } = parsed.data;
       const file = {
         type: contentType,

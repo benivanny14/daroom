@@ -54,23 +54,29 @@ overwriting the development server's compiled chunks.
 
 ## Payments
 
-SonicPesa is the only payment provider. It collects mobile money in Tanzania
-(M-Pesa, Tigo Pesa, Airtel Money, Halopesa) through a USSD/STK push that the
-customer approves on their own phone. DarRoom never asks for a mobile-money PIN.
+SonicPesa is the only payment provider. It collects the agent listing
+subscription in Tanzania (M-Pesa, Tigo Pesa, Airtel Money, Halopesa) through a
+USSD/STK push that the agent approves on their own phone. DarRoom never asks for
+a mobile-money PIN.
+
+**Rent never passes through DarRoom.** Tenants contact the Agent on WhatsApp,
+agree the rent and terms, and pay the Agent directly. DarRoom does not hold rent,
+does not take a tenant fee, and has no rent-payment page.
 
 - **Agent subscription** (`app/api/payments/subscription/checkout`): the only
   plan is TSh 5,000 for 30 days. The amount and plan are fixed on the server.
   When the signed webhook confirms the payment, `lib/subscription-payments.ts`
   marks the `PaymentEvent` as verified and adds a 30-day `Subscription` period
   (a renewal extends the remaining time instead of replacing it).
-- **Tenant rent** (`app/api/payments/checkout`): the tenant enters an amount and
-  phone number on `/rent`. The route stores a `RentPayment` row and sends the
-  push; the webhook moves it to `PAID`, `FAILED`, or `CANCELLED`.
 - **Webhook** (`/api/payments/webhook`): verifies `X-SonicPesa-Signature`
-  (HMAC-SHA256 of the raw body using `SONICPESA_SECRET_KEY`) before changing
-  either record, rejects amount mismatches, and is idempotent.
-- **Status polling**: both checkouts expose `GET ...?paymentId=...&refresh=1`
-  so the UI can ask SonicPesa directly when a webhook is delayed.
+  (HMAC-SHA256 of the raw body using `SONICPESA_SECRET_KEY`) before changing the
+  subscription payment, rejects amount mismatches, and is idempotent.
+- **Status polling**: `GET ...?paymentId=...&refresh=1` asks SonicPesa directly
+  when a webhook is delayed, and `GET ...?reconcile=1` sweeps the agent's pending
+  payments on dashboard load.
+- **Reconciliation**: `lib/payment-reconcile.ts` polls any payment that is still
+  pending after two minutes, so a missed webhook cannot leave a paid agent
+  without access.
 
 Set `SONICPESA_ACCESS_KEY`, `SONICPESA_SECRET_KEY`, and optionally
 `SONICPESA_BASE_URL`, then register the webhook URL in the SonicPesa dashboard.
@@ -119,10 +125,21 @@ No code change is needed.
 ## Application scope
 
 - `/` is the public rental finder with district, neighborhood,
-  budget, and text filters, database-backed listings, direct WhatsApp contact,
-  reviews, viewing appointments, favorites, and public reporting. Search
-  excludes prices below TSh 50,000 per month and listings whose 60-day window
-  has ended. Signed-in visitors get account-synced favorites.
+  budget, bedrooms, and "must have" filters (furnished, Wi-Fi, electricity
+  included, students, pets, available now), database-backed listings, direct
+  WhatsApp contact, reviews, viewing appointments, favorites, and public
+  reporting. Cards show the review score. Search excludes prices below TSh
+  50,000 per month and listings whose 60-day window has ended. Signed-in
+  visitors get account-synced favorites.
+- `/listing/[id]` is rendered on the server with per-listing title, description,
+  canonical URL, Open Graph/Twitter cards and `RealEstateListing` JSON-LD, so a
+  room is indexable and shareable. It shows the Agent's public profile link and a
+  share button.
+- `/agents/[id]` is the public Agent profile: verified badge, member-since date
+  and every live room from that Agent.
+- `/contact` lists the support, accounts, safety and privacy email addresses.
+- `/api/health` is a public uptime probe that checks PostgreSQL and reports which
+  integrations are configured without exposing secrets.
 - `/account` shows the login/registration flow to guests. Signed-in users get a
   dashboard with profile editing, password change, device-wide logout,
   account favorites, and their viewing appointments.
@@ -132,6 +149,17 @@ No code change is needed.
   availability toggle, expiry and 60-day renewal, viewing management (bookings
   are confirmed immediately, with no agent approval step), and ID verification
   submission.
+- Agents describe each room while adding photos: electricity arrangement (own
+  meter or shared bill), whether electricity is included in the rent, Wi-Fi, and
+  whether the toilet is private or shared. Those details appear on the card and
+  the listing page.
+- **Photos only.** The browser input, the presign API and the confirm step all
+  reject `video/*`; only JPEG, PNG and WebP are accepted. Large phone photos are
+  resized to 2000 px and re-encoded in the browser before upload.
+- `/admin` is the moderation console: open reports, agent accounts and
+  subscriptions, and the audit log. There is no listing approval step. An admin
+  can grant one Agent **free access** (no subscription) to create listings and
+  upload photos, then switch it off so the paid plan applies again.
 - Tenants see multiple photos as a slideshow on `/listing/[id]` (thumbnails,
   dots, previous/next, swipe and keyboard arrows). Listing cards keep a compact
   carousel with a photo counter.
@@ -147,8 +175,9 @@ No code change is needed.
 2. The agent creates a listing; it goes live immediately with a 60-day expiry.
 3. The agent can add photos while creating the listing, or later from the
    listing card (presign → PUT → confirm). Several photos can be selected at
-   once; each is uploaded in order and the upload order becomes the slideshow
-   order. The first photo is the cover.
+   once; each is compressed, uploaded in order and the upload order becomes the
+   slideshow order. The first photo is the cover. Videos are rejected at every
+   step; only JPEG, PNG and WebP are accepted.
 4. The listing appears in the public feed and `/listing/[id]` as soon as it is
    saved. There is no approval step.
 5. When a room is taken, the agent marks it unavailable. It stays visible with
@@ -256,8 +285,14 @@ managed PostgreSQL instance with backups.
 For SonicPesa, set the webhook URL in the SonicPesa dashboard to
 `https://<your-domain>/api/payments/webhook`. The handler verifies the
 `X-SonicPesa-Signature` HMAC (SHA-256 of the raw body using
-`SONICPESA_SECRET_KEY`) before changing any `RentPayment` or `PaymentEvent`
-row.
+`SONICPESA_SECRET_KEY`) before changing any `PaymentEvent` row.
+
+### Database backups
+
+`.github/workflows/db-backup.yml` runs `pg_dump` daily and on demand, then keeps
+the dump as a 30-day artifact. Add `SUPABASE_DB_URL` (the session-pooler URI on
+port 5432) as a repository secret. Download a dump regularly and keep a copy
+outside GitHub; free Supabase projects do not include point-in-time recovery.
 
 ### Deploying to Vercel + Supabase
 

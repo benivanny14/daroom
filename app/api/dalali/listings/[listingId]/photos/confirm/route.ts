@@ -53,7 +53,7 @@ export async function POST(
         where: { userId: user.id },
         orderBy: { endsAt: "desc" }
       });
-      if (!hasListingWriteAccess(subscription)) {
+      if (!hasListingWriteAccess(subscription) && !user.freeAccess) {
         return NextResponse.json({ error: "Your subscription has expired. Pay TSh 5,000 before adding photos." }, { status: 403 });
       }
 

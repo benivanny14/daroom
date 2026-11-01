@@ -1,14 +1,15 @@
 import type { MetadataRoute } from "next";
+import { notExpiredFilter } from "@/lib/listing-policy";
 import { prisma } from "@/lib/prisma";
+import { SITE_URL } from "@/lib/site";
 
-const BASE_PATHS = ["", "/dalali", "/account", "/faq", "/privacy", "/terms"];
+const BASE_PATHS = ["", "/dalali", "/account", "/faq", "/privacy", "/terms", "/contact"];
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const baseUrl = process.env.APP_URL || "https://darroom.site";
   const now = new Date();
 
   const staticEntries: MetadataRoute.Sitemap = BASE_PATHS.map((path) => ({
-    url: `${baseUrl}${path}`,
+    url: `${SITE_URL}${path}`,
     lastModified: now,
     changeFrequency: path === "" ? "daily" : "weekly",
     priority: path === "" ? 1 : path === "/dalali" ? 0.8 : 0.5
@@ -17,7 +18,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   let listings: { id: string; updatedAt: Date }[] = [];
   try {
     listings = await prisma.listing.findMany({
-      where: { status: "APPROVED" },
+      where: {
+        status: "APPROVED",
+        priceTzs: { gte: 50_000 },
+        AND: [notExpiredFilter()]
+      },
       select: { id: true, updatedAt: true },
       orderBy: { updatedAt: "desc" },
       take: 5000
@@ -29,7 +34,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   return [
     ...staticEntries,
     ...listings.map((listing) => ({
-      url: `${baseUrl}/listing/${listing.id}`,
+      url: `${SITE_URL}/listing/${listing.id}`,
       lastModified: listing.updatedAt,
       changeFrequency: "weekly" as const,
       priority: 0.7

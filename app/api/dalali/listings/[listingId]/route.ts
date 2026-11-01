@@ -24,6 +24,9 @@ const listingUpdate = z.object({
   furnished: z.boolean().optional(),
   allowsPets: z.boolean().optional(),
   allowsStudents: z.boolean().optional(),
+  electricityMode: z.enum(["INDEPENDENT", "SHARED"]).optional(),
+  hasWifi: z.boolean().optional(),
+  toiletMode: z.enum(["PRIVATE", "SHARED"]).optional(),
   isAvailable: z.boolean().optional(),
   latitude: z.number().min(-90).max(90).nullable().optional(),
   longitude: z.number().min(-180).max(180).nullable().optional()
@@ -82,7 +85,7 @@ export async function PATCH(
         where: { userId: user.id },
         orderBy: { endsAt: "desc" }
       });
-      if (!hasListingWriteAccess(subscription)) return { status: "expired" as const };
+      if (!hasListingWriteAccess(subscription) && !user.freeAccess) return { status: "expired" as const };
       const neighborhood = await findOrCreateNeighborhood(
         tx,
         input.data.district,
@@ -106,6 +109,9 @@ export async function PATCH(
           ...(input.data.furnished !== undefined ? { furnished: input.data.furnished } : {}),
           ...(input.data.allowsPets !== undefined ? { allowsPets: input.data.allowsPets } : {}),
           ...(input.data.allowsStudents !== undefined ? { allowsStudents: input.data.allowsStudents } : {}),
+          ...(input.data.electricityMode !== undefined ? { electricityMode: input.data.electricityMode } : {}),
+          ...(input.data.hasWifi !== undefined ? { hasWifi: input.data.hasWifi } : {}),
+          ...(input.data.toiletMode !== undefined ? { toiletMode: input.data.toiletMode } : {}),
           ...(input.data.isAvailable !== undefined ? { isAvailable: input.data.isAvailable } : {}),
           ...(input.data.latitude !== undefined ? { latitude: input.data.latitude } : {}),
           ...(input.data.longitude !== undefined ? { longitude: input.data.longitude } : {}),

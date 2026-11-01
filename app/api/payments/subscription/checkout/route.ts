@@ -157,6 +157,47 @@ export async function GET(request: NextRequest) {
     }
 
     const paymentId = request.nextUrl.searchParams.get("paymentId") || "";
+
+    // Sweep payments whose webhook never arrived. This runs when the Agent opens
+    // the dashboard, so a paid Agent is never stuck without access.
+    if (request.nextUrl.searchParams.get("reconcile") === "1") {
+      const stale = await prisma.paymentEvent.findMany({
+        where: {
+          userId: user.id,
+          status: "PENDING",
+          providerOrderId: { not: null },
+          receivedAt: { lt: new Date(Date.now() - 2 * 60 * 1000) }
+        },
+        select: { id: true, providerOrderId: true },
+        orderBy: { receivedAt: "asc" },
+        take: 5
+      });
+
+      let reconciled = 0;
+      for (const stalePayment of stale) {
+        if (!stalePayment.providerOrderId) continue;
+        try {
+          const order = await getSonicPesaOrderStatus(stalePayment.providerOrderId);
+          if (order.status === "PENDING") continue;
+          const status = statusForOrder(order.status);
+          await prisma.paymentEvent.update({
+            where: { id: stalePayment.id },
+            data: {
+              status,
+              failureReason:
+                status === "REJECTED" ? "The provider reported an unsuccessful payment." : null
+            }
+          });
+          if (status === "VERIFIED") await completeSubscriptionPayment(stalePayment.id);
+          reconciled += 1;
+        } catch (error) {
+          console.error("SonicPesa reconciliation failed", error instanceof Error ? error.message : "unknown");
+        }
+      }
+
+      return NextResponse.json({ reconciled });
+    }
+
     if (!paymentId) {
       return NextResponse.json({ error: "A payment id is required." }, { status: 400 });
     }

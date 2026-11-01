@@ -49,7 +49,8 @@ export async function getSessionUser() {
       email: true,
       isEmailVerified: true,
       sessionVersion: true,
-      role: true
+      role: true,
+      freeAccess: true
     }
   });
   if (!user || user.sessionVersion !== sessionVersion) return null;

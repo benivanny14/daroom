@@ -35,13 +35,6 @@ enum PaymentStatus {
   REJECTED
 }
 
-enum RentPaymentStatus {
-  PENDING
-  PAID
-  FAILED
-  CANCELLED
-}
-
 enum SubscriptionStatus {
   ACTIVE
   EXPIRED
@@ -51,6 +44,18 @@ enum SubscriptionPlan {
   BASIC
   PREMIUM
   FEATURED
+}
+
+/// How electricity is billed in the room.
+enum ElectricityMode {
+  INDEPENDENT
+  SHARED
+}
+
+/// Whether the toilet is private to the room or shared with neighbours.
+enum ToiletMode {
+  PRIVATE
+  SHARED
 }
 
 enum TokenPurpose {
@@ -73,6 +78,10 @@ model User {
   totpEnabled     Boolean           @default(false)
   /// JSON array of SHA-256 hashes of one-time backup codes.
   totpBackupCodes String?
+  /// Admin-granted exemption from the paid subscription. While true the agent
+  /// can create listings and upload photos for free; turning it off puts the
+  /// agent back on the TSh 5,000 plan.
+  freeAccess      Boolean          @default(false)
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
   listings        Listing[]
@@ -86,7 +95,6 @@ model User {
   reportsMade     Report[]         @relation("Reporter")
   appointments    ViewingAppointment[]
   idVerification  IdVerification[]
-  rentPayments    RentPayment[]
 }
 
 model Region {
@@ -142,6 +150,12 @@ model Listing {
   furnished      Boolean        @default(false)
   allowsPets     Boolean        @default(false)
   allowsStudents Boolean        @default(true)
+  /// Independent meter or a shared bill. `luku` still says whether electricity
+  /// is included in the rent.
+  electricityMode ElectricityMode @default(SHARED)
+  hasWifi        Boolean        @default(false)
+  /// Private toilet inside the room, or one shared with other tenants.
+  toiletMode     ToiletMode     @default(SHARED)
   latitude       Float?
   longitude      Float?
   createdAt      DateTime       @default(now())
@@ -155,7 +169,6 @@ model Listing {
   reviews        Review[]
   appointments   ViewingAppointment[]
   analytics      ListingAnalytics?
-  rentPayments   RentPayment[]
 
   @@index([status, districtId, neighborhoodId, priceTzs])
   @@index([ownerId, status])
@@ -263,35 +276,6 @@ model PaymentEvent {
 
   @@index([userId, receivedAt])
   @@index([status, receivedAt])
-}
-
-/// A mobile-money rent payment collected through SonicPesa. `rentReference`
-/// stores the rent/tenancy reference supplied by the caller; `listingId` links
-/// the payment to a room when the tenant chooses one.
-model RentPayment {
-  id                String            @id @default(cuid())
-  tenantId          String
-  listingId         String?
-  rentReference     String?
-  amountTzs         Int
-  phone             String
-  provider          String            @default("SONICPESA")
-  providerOrderId   String?           @unique
-  providerTransId   String?           @unique
-  providerReference String?
-  channel           String?
-  status            RentPaymentStatus @default(PENDING)
-  failureReason     String?
-  rawPayload        Json?
-  paidAt            DateTime?
-  createdAt         DateTime          @default(now())
-  updatedAt         DateTime          @updatedAt
-  tenant            User              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  listing           Listing?          @relation(fields: [listingId], references: [id], onDelete: SetNull)
-
-  @@index([tenantId, createdAt])
-  @@index([status, createdAt])
-  @@index([listingId])
 }
 
 model SiteSetting {

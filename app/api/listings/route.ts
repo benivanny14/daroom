@@ -34,10 +34,15 @@ export async function GET(request: NextRequest) {
     const district = searchParams.get("district");
     const neighborhood = searchParams.get("neighborhood");
     const maxPrice = Number(searchParams.get("maxPrice"));
+    const minPrice = Number(searchParams.get("minPrice"));
     const query = searchParams.get("q")?.trim();
     const bedrooms = searchParams.get("bedrooms");
     const furnished = searchParams.get("furnished");
     const allowsPets = searchParams.get("allowsPets");
+    const allowsStudents = searchParams.get("students");
+    const luku = searchParams.get("luku");
+    const wifi = searchParams.get("wifi");
+    const available = searchParams.get("available");
     const sortKey = searchParams.get("sort") || "featured";
     const cursor = searchParams.get("cursor")?.trim() || null;
     const requestedLimit = Number(searchParams.get("limit"));
@@ -48,9 +53,14 @@ export async function GET(request: NextRequest) {
       : DEFAULT_LIMIT;
     const orderBy = SORTS[sortKey] ?? SORTS.featured;
 
+    // Every listing is at least TSh 50,000; the tenant's range narrows it.
+    const priceFilter: Prisma.IntFilter = { gte: 50_000 };
+    if (Number.isSafeInteger(maxPrice) && maxPrice > 0) priceFilter.lte = maxPrice;
+    if (Number.isSafeInteger(minPrice) && minPrice > 0) priceFilter.gte = Math.max(50_000, minPrice);
+
     const where: Prisma.ListingWhereInput = {
       status: "APPROVED",
-      priceTzs: { gte: 50_000 },
+      priceTzs: priceFilter,
       AND: [
         notExpiredFilter(),
         ...(query
@@ -66,10 +76,13 @@ export async function GET(request: NextRequest) {
       ],
       ...(district ? { district: { name: district } } : {}),
       ...(neighborhood ? { neighborhood: { name: neighborhood } } : {}),
-      ...(Number.isSafeInteger(maxPrice) && maxPrice > 0 ? { priceTzs: { lte: maxPrice } } : {}),
       ...(bedroomsNum ? (bedroomsNum >= 4 ? { bedrooms: { gte: 4 } } : { bedrooms: bedroomsNum }) : {}),
       ...(furnished === "true" ? { furnished: true } : furnished === "false" ? { furnished: false } : {}),
-      ...(allowsPets === "true" ? { allowsPets: true } : allowsPets === "false" ? { allowsPets: false } : {})
+      ...(allowsPets === "true" ? { allowsPets: true } : allowsPets === "false" ? { allowsPets: false } : {}),
+      ...(allowsStudents === "true" ? { allowsStudents: true } : {}),
+      ...(luku === "true" ? { luku: true } : {}),
+      ...(wifi === "true" ? { hasWifi: true } : {}),
+      ...(available === "true" ? { isAvailable: true } : available === "false" ? { isAvailable: false } : {})
     };
 
     const rows = await prisma.listing.findMany({
@@ -90,6 +103,9 @@ export async function GET(request: NextRequest) {
         furnished: true,
         allowsPets: true,
         allowsStudents: true,
+        electricityMode: true,
+        hasWifi: true,
+        toiletMode: true,
         isFeatured: true,
         isAvailable: true,
         latitude: true,
@@ -106,6 +122,25 @@ export async function GET(request: NextRequest) {
     const nextCursor = hasMore && page.length ? page[page.length - 1].id : null;
     // Counting scans the filtered set, so only the first page pays for it.
     const total = cursor ? null : await prisma.listing.count({ where });
+
+    // One grouped query keeps review averages off the per-listing path.
+    const ratingRows = page.length
+      ? await prisma.review.groupBy({
+          by: ["listingId"],
+          where: { listingId: { in: page.map((listing) => listing.id) } },
+          _avg: { rating: true },
+          _count: { _all: true }
+        })
+      : [];
+    const ratings = new Map(
+      ratingRows.map((row) => [
+        row.listingId,
+        {
+          average: row._avg.rating !== null ? Number(row._avg.rating.toFixed(1)) : null,
+          count: row._count._all
+        }
+      ])
+    );
 
     const response = NextResponse.json({
       listings: page.map((listing) => ({
@@ -125,12 +160,17 @@ export async function GET(request: NextRequest) {
         furnished: listing.furnished,
         allowsPets: listing.allowsPets,
         allowsStudents: listing.allowsStudents,
+        electricityMode: listing.electricityMode,
+        hasWifi: listing.hasWifi,
+        toiletMode: listing.toiletMode,
         isFeatured: listing.isFeatured,
         isAvailable: listing.isAvailable,
         latitude: listing.latitude,
         longitude: listing.longitude,
         featured: listing.isFeatured,
         imageTone: "one" as const,
+        ratingAverage: ratings.get(listing.id)?.average ?? null,
+        reviewCount: ratings.get(listing.id)?.count ?? 0,
         photos: listing.photos.flatMap((photo) => {
           const url = getMediaUrl(photo.storageKey);
           return url ? [{ id: photo.id, url, altText: photo.altText }] : [];

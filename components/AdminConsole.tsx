@@ -36,6 +36,7 @@ type Dalali = {
   email: string;
   phone: string;
   createdAt: string;
+  freeAccess?: boolean;
   subscription: { status: string; endsAt: string } | null;
   verification: {
     id: string;
@@ -348,6 +349,35 @@ export function AdminConsole() {
     } catch (caught) { setError(caught instanceof Error ? caught.message : "Ban failed."); }
   }
 
+  async function toggleFreeAccess(dalali: Dalali) {
+    const next = !dalali.freeAccess;
+    const question = next
+      ? `Give ${dalali.name} free listing and photo uploads without a subscription?`
+      : `End free access for ${dalali.name}? They will need to pay TSh 5,000 to add listings or upload photos.`;
+    if (!window.confirm(question)) return;
+    setError("");
+    setMessage("");
+    try {
+      const response = await fetch(`/api/admin/dalalis/${dalali.id}/free-access`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ freeAccess: next })
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error || "Free access could not be changed.");
+      setDalalis((current) =>
+        current.map((row) => (row.id === dalali.id ? { ...row, freeAccess: next } : row))
+      );
+      setMessage(
+        next
+          ? `Free access granted to ${dalali.name}.`
+          : `Free access removed from ${dalali.name}; the paid plan applies again.`
+      );
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Free access could not be changed.");
+    }
+  }
+
   async function decideVerification(verificationId: string, action: "approve" | "reject") {
     let reason: string | undefined;
     if (action === "reject") {
@@ -544,7 +574,15 @@ export function AdminConsole() {
                 <tr key={dalali.id}>
                   <td>{dalali.name}<br /><small>{new Date(dalali.createdAt).toLocaleDateString("en-GB")}</small></td>
                   <td>{dalali.phone}<br /><small>{dalali.email}</small></td>
-                  <td>{dalali.subscription ? `${dalali.subscription.status === "ACTIVE" && new Date(dalali.subscription.endsAt) > new Date() ? "Active" : "Expired"} · ${new Date(dalali.subscription.endsAt).toLocaleDateString("en-GB")}` : "None"}</td>
+                  <td>
+                    {dalali.freeAccess ? (
+                      <span className="status live">Free access</span>
+                    ) : dalali.subscription ? (
+                      `${dalali.subscription.status === "ACTIVE" && new Date(dalali.subscription.endsAt) > new Date() ? "Active" : "Expired"} · ${new Date(dalali.subscription.endsAt).toLocaleDateString("en-GB")}`
+                    ) : (
+                      "None"
+                    )}
+                  </td>
                   <td>
                     {dalali.verification ? (
                       <>
@@ -583,7 +621,14 @@ export function AdminConsole() {
                     ) : "None"}
                   </td>
                   <td>{dalali._count.listings}</td>
-                  <td><button className="table-action destructive" onClick={() => banDalali(dalali)}>Ban account</button></td>
+                  <td>
+                    <div className="admin-actions">
+                      <button className="table-action" type="button" onClick={() => void toggleFreeAccess(dalali)}>
+                        {dalali.freeAccess ? "End free access" : "Grant free access"}
+                      </button>
+                      <button className="table-action destructive" onClick={() => banDalali(dalali)}>Ban account</button>
+                    </div>
+                  </td>
                 </tr>
               ))}</tbody>
             </table>

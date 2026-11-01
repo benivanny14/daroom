@@ -30,7 +30,7 @@ export default function FAQPage() {
               <summary style={{ cursor: "pointer", fontWeight: "bold", marginBottom: "10px" }}>
                 Do I need an account to search for a room?
               </summary>
-              <p>No. You can search for rooms, view photos, and contact an Agent without an account. An account is only required for Agents who want to add listings.</p>
+              <p>No. You can search for rooms, view photos and browse freely. A free account is needed only to reveal the Agent&apos;s WhatsApp number, save favorites and book a viewing. Agents need an account to add listings.</p>
             </details>
 
             <details style={{ marginBottom: "20px" }}>
@@ -69,7 +69,7 @@ export default function FAQPage() {
               <summary style={{ cursor: "pointer", fontWeight: "bold", marginBottom: "10px" }}>
                 How do I pay?
               </summary>
-              <p>Agents pay the TSh 5,000 monthly subscription from the Agent dashboard with mobile money (M-Pesa, Tigo Pesa, Airtel Money or Halopesa). SonicPesa sends a prompt to your phone and you approve it with your own PIN; DarRoom never asks for your PIN.</p>
+              <p>Agents pay the TSh 5,000 monthly subscription from the Agent dashboard with mobile money (M-Pesa, Tigo Pesa, Airtel Money or Halopesa). SonicPesa sends a prompt to your phone and you approve it with your own PIN; DarRoom never asks for your PIN. Rent is different: you agree it with the Agent on WhatsApp and pay the Agent directly. DarRoom never collects rent.</p>
             </details>
 
             <details style={{ marginBottom: "20px" }}>

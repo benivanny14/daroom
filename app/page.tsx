@@ -1,8 +1,13 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { ListingExplorer } from "@/components/ListingExplorer";
 import { DarkModeToggle } from "@/components/DarkModeToggle";
 import { prisma } from "@/lib/prisma";
 import { getMediaUrl } from "@/lib/storage";
+
+export const metadata: Metadata = {
+  alternates: { canonical: "/" }
+};
 
 // The shell is static apart from the admin-edited hero photo, so it is cached for
 // 30 seconds and re-rendered in the background instead of on every visit.
@@ -39,6 +44,7 @@ export default async function HomePage() {
             <Link href="/terms">Terms</Link>
             <Link href="/privacy">Privacy</Link>
             <Link href="/faq">FAQ</Link>
+            <Link href="/contact">Contact</Link>
           </div>
         </div>
       </footer>

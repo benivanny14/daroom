@@ -23,6 +23,13 @@ export function ListingExplorer({ heroImage }: { heroImage?: string | null }) {
   const [district, setDistrict] = useState("");
   const [neighborhood, setNeighborhood] = useState("");
   const [maxPrice, setMaxPrice] = useState("");
+  const [bedrooms, setBedrooms] = useState("");
+  const [furnished, setFurnished] = useState(false);
+  const [pets, setPets] = useState(false);
+  const [students, setStudents] = useState(false);
+  const [luku, setLuku] = useState(false);
+  const [wifi, setWifi] = useState(false);
+  const [availableOnly, setAvailableOnly] = useState(true);
   const [query, setQuery] = useState("");
   const [reporting, setReporting] = useState<Listing | null>(null);
   const [category, setCategory] = useState(reportCategories[0]);
@@ -133,13 +140,20 @@ export function ListingExplorer({ heroImage }: { heroImage?: string | null }) {
       if (district) params.set("district", district);
       if (neighborhood) params.set("neighborhood", neighborhood);
       if (maxPrice) params.set("maxPrice", maxPrice);
+      if (bedrooms) params.set("bedrooms", bedrooms);
+      if (furnished) params.set("furnished", "true");
+      if (pets) params.set("allowsPets", "true");
+      if (students) params.set("students", "true");
+      if (luku) params.set("luku", "true");
+      if (wifi) params.set("wifi", "true");
+      if (availableOnly) params.set("available", "true");
       if (debouncedQuery) params.set("q", debouncedQuery);
       if (sort) params.set("sort", sort);
       params.set("limit", "24");
       if (cursor) params.set("cursor", cursor);
       return params.toString();
     },
-    [debouncedQuery, district, maxPrice, neighborhood, sort]
+    [availableOnly, bedrooms, debouncedQuery, district, furnished, luku, maxPrice, neighborhood, pets, sort, students, wifi]
   );
 
   // Listings are filtered, sorted and paged by the API so large inventories stay fast.
@@ -199,8 +213,22 @@ export function ListingExplorer({ heroImage }: { heroImage?: string | null }) {
     district,
     neighborhood,
     maxPrice,
+    bedrooms,
     query.trim()
-  ].filter(Boolean).length;
+  ].filter(Boolean).length + [furnished, pets, students, luku, wifi].filter(Boolean).length;
+
+  function clearFilters() {
+    setDistrict("");
+    setNeighborhood("");
+    setMaxPrice("");
+    setBedrooms("");
+    setFurnished(false);
+    setPets(false);
+    setStudents(false);
+    setLuku(false);
+    setWifi(false);
+    setQuery("");
+  }
 
   async function submitReport(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -379,6 +407,22 @@ export function ListingExplorer({ heroImage }: { heroImage?: string | null }) {
               <option value="100000">TSh 50,000 – 100,000</option>
               <option value="150000">Up to TSh 150,000</option>
               <option value="200000">Up to TSh 200,000</option>
+              <option value="300000">Up to TSh 300,000</option>
+              <option value="500000">Up to TSh 500,000</option>
+            </select>
+          </div>
+          <div className="field">
+            <label htmlFor="bedrooms">Bedrooms</label>
+            <select
+              id="bedrooms"
+              value={bedrooms}
+              onChange={(event) => setBedrooms(event.target.value)}
+            >
+              <option value="">Any size</option>
+              <option value="1">1 bedroom</option>
+              <option value="2">2 bedrooms</option>
+              <option value="3">3 bedrooms</option>
+              <option value="4">4+ bedrooms</option>
             </select>
           </div>
           <div className="field keyword-field">
@@ -390,6 +434,37 @@ export function ListingExplorer({ heroImage }: { heroImage?: string | null }) {
               placeholder="e.g. near campus..."
             />
           </div>
+          <fieldset className="filter-checks">
+            <legend>Must have</legend>
+            <label>
+              <input type="checkbox" checked={furnished} onChange={(event) => setFurnished(event.target.checked)} />
+              Furnished
+            </label>
+            <label>
+              <input type="checkbox" checked={wifi} onChange={(event) => setWifi(event.target.checked)} />
+              Wi-Fi
+            </label>
+            <label>
+              <input type="checkbox" checked={luku} onChange={(event) => setLuku(event.target.checked)} />
+              Electricity included
+            </label>
+            <label>
+              <input type="checkbox" checked={students} onChange={(event) => setStudents(event.target.checked)} />
+              Students welcome
+            </label>
+            <label>
+              <input type="checkbox" checked={pets} onChange={(event) => setPets(event.target.checked)} />
+              Pets allowed
+            </label>
+            <label>
+              <input
+                type="checkbox"
+                checked={availableOnly}
+                onChange={(event) => setAvailableOnly(event.target.checked)}
+              />
+              Available now
+            </label>
+          </fieldset>
           <button className="search-button" type="submit">
             <span>Search listings</span><span aria-hidden="true">→</span>
           </button>
@@ -406,12 +481,7 @@ export function ListingExplorer({ heroImage }: { heroImage?: string | null }) {
             <button
               type="button"
               className="clear-filters"
-              onClick={() => {
-                setDistrict("");
-                setNeighborhood("");
-                setMaxPrice("");
-                setQuery("");
-              }}
+              onClick={clearFilters}
             >
               Clear filters
             </button>
@@ -479,9 +549,36 @@ export function ListingExplorer({ heroImage }: { heroImage?: string | null }) {
                     </span>
                     <span className="per">/ month</span>
                   </div>
+                  <div className="listing-rating">
+                    {listing.ratingAverage ? (
+                      <>
+                        <span className="stars" aria-hidden="true">
+                          {"★".repeat(Math.round(listing.ratingAverage))}
+                          {"☆".repeat(5 - Math.round(listing.ratingAverage))}
+                        </span>
+                        <span>
+                          {listing.ratingAverage.toFixed(1)} ({listing.reviewCount}{" "}
+                          {listing.reviewCount === 1 ? "review" : "reviews"})
+                        </span>
+                      </>
+                    ) : (
+                      <span className="muted">No reviews yet</span>
+                    )}
+                  </div>
                   <div className="terms">
                     <span className="term">From {listing.minMonths} {listing.minMonths === 1 ? "month" : "months"}</span>
                     <span className="term">{listing.luku ? "Electricity included" : "Electricity excluded"}</span>
+                    {listing.electricityMode && (
+                      <span className="term">
+                        {listing.electricityMode === "INDEPENDENT" ? "Own meter" : "Shared electricity"}
+                      </span>
+                    )}
+                    {listing.hasWifi && <span className="term">Wi-Fi</span>}
+                    {listing.toiletMode && (
+                      <span className="term">
+                        {listing.toiletMode === "PRIVATE" ? "Private toilet" : "Shared toilet"}
+                      </span>
+                    )}
                     <span className="term">{listing.water}</span>
                     {listing.bedrooms && <span className="term">{listing.bedrooms} {listing.bedrooms === 1 ? "bedroom" : "bedrooms"}</span>}
                     {listing.furnished && <span className="term">Furnished</span>}
@@ -551,12 +648,7 @@ export function ListingExplorer({ heroImage }: { heroImage?: string | null }) {
                 <button
                   type="button"
                   className="empty-reset"
-                  onClick={() => {
-                    setDistrict("");
-                    setNeighborhood("");
-                    setMaxPrice("");
-                    setQuery("");
-                  }}
+                  onClick={clearFilters}
                 >
                   Clear filters
                 </button>

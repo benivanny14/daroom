@@ -15,6 +15,7 @@ export async function GET(request: NextRequest) {
         email: true,
         phone: true,
         createdAt: true,
+        freeAccess: true,
         subscriptions: { orderBy: { endsAt: "desc" }, take: 1, select: { status: true, endsAt: true, plan: true } },
         idVerification: { orderBy: { createdAt: "desc" }, take: 1, select: { id: true, documentType: true, documentUrl: true, status: true, rejectedReason: true, createdAt: true } },
         _count: { select: { listings: true } }

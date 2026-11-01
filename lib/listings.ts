@@ -25,10 +25,15 @@ export type Listing = {
   furnished: boolean;
   allowsPets: boolean;
   allowsStudents: boolean;
+  electricityMode?: "INDEPENDENT" | "SHARED";
+  hasWifi?: boolean;
+  toiletMode?: "PRIVATE" | "SHARED";
   isFeatured: boolean;
   isAvailable?: boolean;
   latitude?: number | null;
   longitude?: number | null;
+  ratingAverage?: number | null;
+  reviewCount?: number;
 };
 
 export const districts: District[] = [

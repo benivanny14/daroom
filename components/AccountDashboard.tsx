@@ -217,7 +217,6 @@ export function AccountDashboard({ user: initialUser }: { user: SessionUser }) {
         </div>
         <div className="account-hero-actions">
           {user.role === "DALALI" && <Link className="table-action" href="/dalali">Agent Dashboard</Link>}
-          {user.role === "TENANT" && <Link className="table-action" href="/rent">Pay rent</Link>}
           <button className="table-action destructive" type="button" disabled={loggingOut} onClick={logoutEverywhere}>
             {loggingOut ? "Logging out..." : "Log out of all devices"}
           </button>
@@ -357,13 +356,13 @@ export function AccountDashboard({ user: initialUser }: { user: SessionUser }) {
             <div className="panel-heading">
               <div>
                 <span className="eyebrow">Rent</span>
-                <h2>Pay rent with mobile money</h2>
+                <h2>Pay your Agent directly</h2>
               </div>
-              <Link className="table-action" href="/rent">Pay rent</Link>
             </div>
             <p>
-              Pay your agent through M-Pesa, Tigo Pesa, Airtel Money or Halopesa. SonicPesa sends the
-              prompt to your phone and you approve it with your own PIN. DarRoom never asks for your PIN.
+              DarRoom does not collect rent. Open the room you want, tap{" "}
+              <strong>Contact the Agent on WhatsApp</strong>, agree the rent and terms, and pay the
+              Agent directly. DarRoom never asks for your mobile-money PIN.
             </p>
           </article>
         )}
