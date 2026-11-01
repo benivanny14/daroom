@@ -2,9 +2,10 @@
 
 Mobile-first Dar es Salaam rental-discovery app built with Next.js App Router,
 TypeScript, Prisma, and PostgreSQL. The tenant journey is public and free;
-tenants contact the advertiser directly. Rent can optionally be paid through
-DarRoom's SonicPesa mobile-money page when an agent asks the tenant to use it.
-DarRoom never asks for a tenant's mobile-money PIN.
+tenants contact the advertiser directly. DarRoom never collects rent: the
+tenant and the agent agree on WhatsApp and the tenant pays the agent outside
+the platform. The only payment in the system is the agent listing
+subscription. DarRoom never asks for a mobile-money PIN.
 
 ## Run locally (Windows)
 
@@ -54,10 +55,10 @@ overwriting the development server's compiled chunks.
 
 ## Payments
 
-SonicPesa is the only payment provider. It collects the agent listing
-subscription in Tanzania (M-Pesa, Tigo Pesa, Airtel Money, Halopesa) through a
-USSD/STK push that the agent approves on their own phone. DarRoom never asks for
-a mobile-money PIN.
+SonicPesa is the only payment provider, and the only thing it collects is the
+agent listing subscription in Tanzania (M-Pesa, Tigo Pesa, Airtel Money,
+Halopesa) through a USSD/STK push that the agent approves on their own phone.
+DarRoom never asks for a mobile-money PIN.
 
 **Rent never passes through DarRoom.** Tenants contact the Agent on WhatsApp,
 agree the rent and terms, and pay the Agent directly. DarRoom does not hold rent,

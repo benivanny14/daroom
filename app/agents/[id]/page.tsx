@@ -43,6 +43,11 @@ async function getAgent(id: string) {
       luku: true,
       water: true,
       bedrooms: true,
+      furnished: true,
+      allowsPets: true,
+      electricityMode: true,
+      hasWifi: true,
+      toiletMode: true,
       isFeatured: true,
       isAvailable: true,
       district: { select: { name: true } },
@@ -66,6 +71,11 @@ async function getAgent(id: string) {
       luku: listing.luku,
       water: listing.water,
       bedrooms: listing.bedrooms,
+      furnished: listing.furnished,
+      allowsPets: listing.allowsPets,
+      electricityMode: listing.electricityMode,
+      hasWifi: listing.hasWifi,
+      toiletMode: listing.toiletMode,
       isFeatured: listing.isFeatured,
       isAvailable: listing.isAvailable,
       district: listing.district.name,
@@ -176,6 +186,15 @@ export default async function AgentProfilePage({
                         {listing.bedrooms} {listing.bedrooms === 1 ? "bedroom" : "bedrooms"}
                       </span>
                     )}
+                    <span className="term">
+                      {listing.electricityMode === "INDEPENDENT" ? "Own meter" : "Shared electricity"}
+                    </span>
+                    {listing.hasWifi && <span className="term">Wi-Fi</span>}
+                    <span className="term">
+                      {listing.toiletMode === "PRIVATE" ? "Private toilet" : "Shared toilet"}
+                    </span>
+                    {listing.furnished && <span className="term">Furnished</span>}
+                    {listing.allowsPets && <span className="term">Pets allowed</span>}
                     {listing.isAvailable === false && (
                       <span className="term" style={{ color: "var(--red)" }}>Rented</span>
                     )}
