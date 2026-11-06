@@ -45,15 +45,37 @@ function reject(): NextResponse {
 function pass(request: NextRequest): NextResponse {
   const response = NextResponse.next();
   const pathname = request.nextUrl.pathname;
-  if (!PUBLIC_API.some((pattern) => pattern.test(pathname))) {
+  if (pathname.startsWith("/api/") && !PUBLIC_API.some((pattern) => pattern.test(pathname))) {
     response.headers.set("Cache-Control", "private, no-store");
     response.headers.set("Vary", "Cookie");
   }
   return response;
 }
 
+/** The one host every page is served from. */
+const CANONICAL_HOST = "darroom.site";
+const REDIRECTED_HOSTS = new Set(["www.darroom.site"]);
+
 export function middleware(request: NextRequest) {
-  if (SERVER_TO_SERVER.some((pattern) => pattern.test(request.nextUrl.pathname))) {
+  const pathname = request.nextUrl.pathname;
+
+  // `vercel.json` also declares this redirect, but a hostname added to the
+  // project later can bypass it. Keeping the rule here means `www` never
+  // serves a second copy of the site, whatever the host is configured to do.
+  const host = request.headers.get("host")?.split(":")[0]?.toLowerCase();
+  if (host && REDIRECTED_HOSTS.has(host)) {
+    const url = request.nextUrl.clone();
+    url.host = CANONICAL_HOST;
+    url.protocol = "https:";
+    url.port = "";
+    return NextResponse.redirect(url, 308);
+  }
+
+  // Only API routes need the origin check; pages and server actions are
+  // protected by Next.js itself.
+  if (!pathname.startsWith("/api/")) return NextResponse.next();
+
+  if (SERVER_TO_SERVER.some((pattern) => pattern.test(pathname))) {
     return pass(request);
   }
 
@@ -84,5 +106,7 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/api/:path*"]
+  // Everything except the immutable build assets, so the host redirect also
+  // covers prerendered pages.
+  matcher: ["/((?!_next/static|_next/image).*)"]
 };
