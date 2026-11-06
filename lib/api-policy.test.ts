@@ -109,10 +109,10 @@ describe("phone privacy", () => {
 });
 
 describe("plan rules", () => {
-  it("sells exactly one agent plan for TSh 5,000", () => {
+  it("sells exactly one agent plan for TSh 2,000", () => {
     expect(AGENT_PLAN_ID).toBe("BASIC");
     expect(AGENT_PLAN).toBe(SUBSCRIPTION_PLANS.BASIC);
-    expect(AGENT_PLAN.priceTzs).toBe(5000);
+    expect(AGENT_PLAN.priceTzs).toBe(2000);
     expect(AGENT_PLAN.durationDays).toBe(30);
     expect(AGENT_PLAN.featuredSlots).toBe(1);
   });

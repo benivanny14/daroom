@@ -50,7 +50,7 @@ export async function PATCH(
       orderBy: { endsAt: "desc" }
     });
     if (!hasListingWriteAccess(accessSubscription) && !user.freeAccess) {
-      return NextResponse.json({ error: "Your subscription has expired. Pay TSh 5,000 before editing a listing." }, { status: 403 });
+      return NextResponse.json({ error: "Your subscription has expired. Pay TSh 2,000 before editing a listing." }, { status: 403 });
     }
 
     const rawBody = await readJsonBody(request, 16 * 1024);

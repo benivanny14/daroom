@@ -65,7 +65,7 @@ agree the rent and terms, and pay the Agent directly. DarRoom does not hold rent
 does not take a tenant fee, and has no rent-payment page.
 
 - **Agent subscription** (`app/api/payments/subscription/checkout`): the only
-  plan is TSh 5,000 for 30 days. The amount and plan are fixed on the server.
+  plan is TSh 2,000 for 30 days. The amount and plan are fixed on the server.
   When the signed webhook confirms the payment, `lib/subscription-payments.ts`
   marks the `PaymentEvent` as verified and adds a 30-day `Subscription` period
   (a renewal extends the remaining time instead of replacing it).
@@ -144,7 +144,7 @@ No code change is needed.
 - `/account` shows the login/registration flow to guests. Signed-in users get a
   dashboard with profile editing, password change, device-wide logout,
   account favorites, and their viewing appointments.
-- `/dalali` is the agent dashboard: one subscription at TSh 5,000 / 30 days
+- `/dalali` is the agent dashboard: one subscription at TSh 2,000 / 30 days
   (no plan picker), listing create/edit/hide/restore, multi-photo upload (10
   photos per listing, hard ceiling 10; under 300 KB per photo after
   browser compression), analytics,

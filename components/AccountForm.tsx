@@ -117,7 +117,7 @@ export function AccountForm({
       <h1>{title}</h1>
       <p className="account-intro">
         {mode === "register"
-          ? "Save rooms, get contact details and book viewings for free. Agents also pay TSh 5,000 for 30 days to publish listings."
+          ? "Save rooms, get contact details and book viewings for free. Agents also pay TSh 2,000 for 30 days to publish listings."
           : mode === "login"
             ? "Log in to see agent numbers, save rooms and book viewings."
             : mode === "resend"

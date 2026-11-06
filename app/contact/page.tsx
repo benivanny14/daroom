@@ -71,7 +71,7 @@ export default function ContactPage() {
           <section>
             <h2>Before you email about a payment</h2>
             <ul>
-              <li>Agents pay TSh 5,000 for 30 days of listing access through SonicPesa.</li>
+              <li>Agents pay TSh 2,000 for 30 days of listing access through SonicPesa.</li>
               <li>Approved payments activate the subscription automatically within a few minutes.</li>
               <li>Tenants never pay DarRoom; rent is agreed and paid to the Agent directly.</li>
               <li>Include the mobile-money number and the time of payment so we can trace it.</li>

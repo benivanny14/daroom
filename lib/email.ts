@@ -76,8 +76,8 @@ export async function sendExpiryReminder(input: {
   await sendEmail({
     to: input.to,
     subject: "Your DarRoom subscription expires in 3 days",
-    text: `Hello ${input.name}. Your plan expires in 3 days. Pay TSh 5,000 to keep promoting your rooms: ${input.renewUrl}`,
-    html: `<p>Hello ${safeName},</p><p>Your plan expires in 3 days. Pay TSh 5,000 to keep promoting your rooms.</p><p><a href="${safeUrl}">Extend your subscription</a></p>`
+    text: `Hello ${input.name}. Your plan expires in 3 days. Pay TSh 2,000 to keep promoting your rooms: ${input.renewUrl}`,
+    html: `<p>Hello ${safeName},</p><p>Your plan expires in 3 days. Pay TSh 2,000 to keep promoting your rooms.</p><p><a href="${safeUrl}">Extend your subscription</a></p>`
   });
 }
 

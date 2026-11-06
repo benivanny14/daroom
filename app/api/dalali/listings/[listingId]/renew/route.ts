@@ -36,7 +36,7 @@ export async function POST(
         orderBy: { endsAt: "desc" }
       });
       if (!hasListingWriteAccess(subscription) && !user.freeAccess) {
-        return NextResponse.json({ error: "Your subscription has expired. Pay TSh 5,000 before extending a listing." }, { status: 403 });
+        return NextResponse.json({ error: "Your subscription has expired. Pay TSh 2,000 before extending a listing." }, { status: 403 });
       }
 
       const expiresAt = listingExpiryFrom();

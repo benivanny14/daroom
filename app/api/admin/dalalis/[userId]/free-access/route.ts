@@ -12,7 +12,7 @@ const input = z.object({
 
 /**
  * Lets an admin give one Agent free listing and photo uploads without a paid
- * subscription, or turn that free access off so the Agent must pay TSh 5,000
+ * subscription, or turn that free access off so the Agent must pay TSh 2,000
  * again. The change is audited and takes effect on the Agent's next request.
  */
 export async function POST(

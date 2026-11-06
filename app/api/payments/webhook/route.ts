@@ -38,7 +38,7 @@ function paymentStateFor(event: WebhookEvent) {
   return mapSonicPesaStatus(event.payment_status || event.status);
 }
 
-/** Agent subscription payment: verify the TSh 5,000 and activate the period. */
+/** Agent subscription payment: verify the TSh 2,000 and activate the period. */
 async function handleSubscriptionPayment(
   event: WebhookEvent,
   payment: { id: string; status: string; amountTzs: number }

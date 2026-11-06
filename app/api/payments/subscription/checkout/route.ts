@@ -48,7 +48,7 @@ function statusForOrder(state: string): "PENDING" | "VERIFIED" | "REJECTED" {
 }
 
 /**
- * Starts the TSh 5,000 agent subscription payment with SonicPesa. The plan and
+ * Starts the TSh 2,000 agent subscription payment with SonicPesa. The plan and
  * amount are fixed on the server; any client value is ignored.
  */
 export async function POST(request: NextRequest) {

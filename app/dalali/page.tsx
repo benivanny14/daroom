@@ -28,13 +28,13 @@ export default async function DalaliPage() {
         <section className="page-hero">
           <span className="eyebrow">Agent dashboard</span>
           <h1>Hello, {user.name}.</h1>
-          <p>Tenants contact you directly on WhatsApp and pay you directly. DarRoom only collects the TSh 5,000 listing subscription; it never holds rent.</p>
+          <p>Tenants contact you directly on WhatsApp and pay you directly. DarRoom only collects the TSh 2,000 listing subscription; it never holds rent.</p>
         </section>
         <DalaliDashboard user={{ id: user.id, name: user.name, email: user.email, phone: user.phone, freeAccess: user.freeAccess }} />
       </main>
       <footer className="site-footer">
         <div className="shell footer-inner">
-          <p>DarRoom · TSh 5,000 / 30 days for Agents only</p>
+          <p>DarRoom · TSh 2,000 / 30 days for Agents only</p>
           <Link href="/">Back to searching rooms</Link>
         </div>
       </footer>

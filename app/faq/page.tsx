@@ -55,7 +55,7 @@ export default function FAQPage() {
               <summary style={{ cursor: "pointer", fontWeight: "bold", marginBottom: "10px" }}>
                 How much does a subscription cost?
               </summary>
-              <p>A subscription is TSh 5,000 for 30 days. There is one plan for all Agents, with no tiers and no extra charges.</p>
+              <p>A subscription is TSh 2,000 for 30 days. There is one plan for all Agents, with no tiers and no extra charges.</p>
             </details>
 
             <details style={{ marginBottom: "20px" }}>
@@ -69,7 +69,7 @@ export default function FAQPage() {
               <summary style={{ cursor: "pointer", fontWeight: "bold", marginBottom: "10px" }}>
                 How do I pay?
               </summary>
-              <p>Agents pay the TSh 5,000 monthly subscription from the Agent dashboard with mobile money (M-Pesa, Tigo Pesa, Airtel Money or Halopesa). SonicPesa sends a prompt to your phone and you approve it with your own PIN; DarRoom never asks for your PIN. Rent is different: you agree it with the Agent on WhatsApp and pay the Agent directly. DarRoom never collects rent.</p>
+              <p>Agents pay the TSh 2,000 monthly subscription from the Agent dashboard with mobile money (M-Pesa, Tigo Pesa, Airtel Money or Halopesa). SonicPesa sends a prompt to your phone and you approve it with your own PIN; DarRoom never asks for your PIN. Rent is different: you agree it with the Agent on WhatsApp and pay the Agent directly. DarRoom never collects rent.</p>
             </details>
 
             <details style={{ marginBottom: "20px" }}>

@@ -156,7 +156,7 @@ export async function POST(request: NextRequest) {
         select: { id: true, status: true }
       });
     });
-    if (!created) return NextResponse.json({ error: "Your subscription has expired. Pay TSh 5,000 before adding or editing a listing." }, { status: 403 });
+    if (!created) return NextResponse.json({ error: "Your subscription has expired. Pay TSh 2,000 before adding or editing a listing." }, { status: 403 });
 
     if (emailConfigured()) {
       try {

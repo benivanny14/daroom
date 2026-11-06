@@ -1231,7 +1231,7 @@ export function DalaliDashboard({
                   />
                 </label>
               </div>
-              {!active && <p className="fine-print">Uploading new photos and editing a listing require an active TSh 5,000/month subscription.</p>}
+              {!active && <p className="fine-print">Uploading new photos and editing a listing require an active TSh {agentPlanPrice}/month subscription.</p>}
             </article>
             );
           })}

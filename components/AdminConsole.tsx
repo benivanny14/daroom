@@ -362,7 +362,7 @@ export function AdminConsole() {
     const next = !dalali.freeAccess;
     const question = next
       ? `Give ${dalali.name} free listing and photo uploads without a subscription?`
-      : `End free access for ${dalali.name}? They will need to pay TSh 5,000 to add listings or upload photos.`;
+      : `End free access for ${dalali.name}? They will need to pay TSh 2,000 to add listings or upload photos.`;
     if (!window.confirm(question)) return;
     setError("");
     setMessage("");

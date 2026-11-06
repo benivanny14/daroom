@@ -80,7 +80,7 @@ model User {
   totpBackupCodes String?
   /// Admin-granted exemption from the paid subscription. While true the agent
   /// can create listings and upload photos for free; turning it off puts the
-  /// agent back on the TSh 5,000 plan.
+  /// agent back on the TSh 2,000 plan.
   freeAccess      Boolean          @default(false)
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt

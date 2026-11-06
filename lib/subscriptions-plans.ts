@@ -14,7 +14,7 @@ export const SUBSCRIPTION_PLANS: Record<string, SubscriptionPlanConfig> = {
   BASIC: {
     id: "BASIC",
     name: "Agent subscription",
-    priceTzs: 5000,
+    priceTzs: 2000,
     durationDays: 30,
     maxListings: 10,
     maxPhotosPerListing: 10,
@@ -54,7 +54,7 @@ export function getPlanById(planId: string): SubscriptionPlanConfig | undefined 
   return SUBSCRIPTION_PLANS[planId];
 }
 
-/** The only plan sold to agents: TSh 5,000 for 30 days. */
+/** The only plan sold to agents: TSh 2,000 for 30 days. */
 export const AGENT_PLAN_ID = "BASIC";
 export const AGENT_PLAN = SUBSCRIPTION_PLANS[AGENT_PLAN_ID];
 
