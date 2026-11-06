@@ -4,7 +4,8 @@ import { assertSameOrigin, authErrorResponse, requireAgent } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { withRateLimit } from "@/lib/rate-limit-middleware";
 import { setSecurityHeaders } from "@/lib/security";
-import { objectInfo } from "@/lib/storage";
+import { objectInfo, deleteMediaObject } from "@/lib/storage";
+import { MAX_PHOTO_BYTES, PHOTO_LIMIT_KB } from "@/lib/file-upload";
 import { readJsonBody } from "@/lib/http";
 import { hasListingWriteAccess } from "@/lib/subscriptions";
 import { photoLimitForPlan } from "@/lib/subscriptions-plans";
@@ -67,20 +68,31 @@ export async function POST(
       const allowedExtensions = ["jpg", "jpeg", "png", "webp"];
       const contentTypeAllowed = !object?.contentType ||
         ["image/jpeg", "image/png", "image/webp"].includes(object.contentType);
+      if (!object || object.size <= 0) {
+        return NextResponse.json({ error: "The photo was not uploaded. Try again." }, { status: 400 });
+      }
+      if (object.size > MAX_PHOTO_BYTES) {
+        // The signed upload URL cannot enforce a size, so an oversized object
+        // may already be in the bucket. Remove it before rejecting the photo,
+        // otherwise failed uploads slowly consume the storage quota.
+        await deleteMediaObject(storageKey).catch(() => undefined);
+        return NextResponse.json(
+          { error: `Photos must be ${PHOTO_LIMIT_KB} KB or smaller. Choose a smaller photo or try again.` },
+          { status: 400 }
+        );
+      }
       if (
-        !object ||
-        object.size <= 0 ||
-        object.size > 15 * 1024 * 1024 ||
         !extension ||
         !allowedExtensions.includes(extension) ||
         !contentTypeAllowed
       ) {
-        return NextResponse.json({ error: "The photo failed the type or size check." }, { status: 400 });
+        await deleteMediaObject(storageKey).catch(() => undefined);
+        return NextResponse.json({ error: "The photo failed the type check. Use a JPEG, PNG or WebP image." }, { status: 400 });
       }
 
       const photo = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
         const currentCount = await tx.listingPhoto.count({ where: { listingId } });
-        if (currentCount >= 10) throw new PhotoLimitError();
+        if (currentCount >= photoLimit) throw new PhotoLimitError(photoLimit);
         return tx.listingPhoto.create({ data: { listingId, storageKey, altText } });
       });
       const response = NextResponse.json({
@@ -94,7 +106,7 @@ export async function POST(
       return setSecurityHeaders(response);
     } catch (error) {
       if (error instanceof PhotoLimitError) {
-        return NextResponse.json({ error: "A listing can have at most 10 photos." }, { status: 400 });
+        return NextResponse.json({ error: `A listing can have at most ${error.limit} photos.` }, { status: 400 });
       }
       console.error("Photo confirmation failed", error);
       return authErrorResponse(error);
@@ -102,4 +114,8 @@ export async function POST(
   });
 }
 
-class PhotoLimitError extends Error {}
+class PhotoLimitError extends Error {
+  constructor(public readonly limit: number) {
+    super(`A listing can have at most ${limit} photos.`);
+  }
+}

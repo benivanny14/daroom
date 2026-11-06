@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { assertSameOrigin, authErrorResponse, requireAdmin } from "@/lib/auth";
 import { sanitizeFileName, validateFileUpload } from "@/lib/file-upload";
+import { HERO_MAX_BYTES } from "@/lib/image-compress";
 import { readJsonBody } from "@/lib/http";
 import { prisma } from "@/lib/prisma";
 import { withRateLimit } from "@/lib/rate-limit-middleware";
@@ -47,6 +48,15 @@ export async function POST(request: NextRequest) {
       };
       const validation = validateFileUpload(file);
       if (!validation.valid) return NextResponse.json({ error: validation.error }, { status: 400 });
+      // The browser compresses the hero with the listing-photo pass. Enforce a
+      // server-side ceiling too, so a browser without canvas support cannot
+      // store a multi-megabyte camera file on the home page.
+      if (file.size > HERO_MAX_BYTES) {
+        return NextResponse.json(
+          { error: `The hero image must be ${Math.round(HERO_MAX_BYTES / 1024)} KB or smaller after compression.` },
+          { status: 400 }
+        );
+      }
 
       const safeName = sanitizeFileName(file.name);
       const extension = safeName.split(".").pop()?.toLowerCase() || "jpg";

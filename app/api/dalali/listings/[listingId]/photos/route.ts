@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { assertSameOrigin, authErrorResponse, requireAgent } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { generateUploadUrl } from "@/lib/storage";
-import { validateFileUpload, generateStorageKey } from "@/lib/file-upload";
+import { validateListingPhoto, generateStorageKey } from "@/lib/file-upload";
 import { withRateLimit } from "@/lib/rate-limit-middleware";
 import { setSecurityHeaders } from "@/lib/security";
 import { readJsonBody } from "@/lib/http";
@@ -71,7 +71,7 @@ export async function POST(
         name: fileName || "photo.jpg"
       };
 
-      const validation = validateFileUpload(file);
+      const validation = validateListingPhoto(file);
       if (!validation.valid) {
         return NextResponse.json({ error: validation.error }, { status: 400 });
       }

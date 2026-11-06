@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { withRateLimit } from "@/lib/rate-limit-middleware";
 import { setSecurityHeaders } from "@/lib/security";
 import { deleteMediaObject, getMediaUrl, objectInfo } from "@/lib/storage";
+import { HERO_MAX_BYTES } from "@/lib/image-compress";
 import { z } from "zod";
 
 export const dynamic = "force-dynamic";
@@ -34,12 +35,17 @@ export async function POST(request: NextRequest) {
       if (
         !object ||
         object.size <= 0 ||
-        object.size > 15 * 1024 * 1024 ||
+        object.size > HERO_MAX_BYTES ||
         !extension ||
         !ALLOWED_EXTENSIONS.includes(extension) ||
         !contentTypeAllowed
       ) {
-        return NextResponse.json({ error: "The image failed the type or size check." }, { status: 400 });
+        // Reject and remove the uploaded object so an oversized or wrong-type
+        // hero file does not stay in storage unused.
+        if (object) await deleteMediaObject(storageKey).catch(() => undefined);
+        return NextResponse.json({
+          error: `The image failed the type or size check. Use a JPEG, PNG or WebP under ${Math.round(HERO_MAX_BYTES / 1024)} KB.`
+        }, { status: 400 });
       }
 
       const previous = await prisma.siteSetting.findUnique({ where: { key: HERO_KEY } });

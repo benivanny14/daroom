@@ -4,7 +4,9 @@ import { notExpiredFilter } from "@/lib/listing-policy";
 import { prisma } from "@/lib/prisma";
 import { SITE_URL } from "@/lib/site";
 
-const BASE_PATHS = ["", "/rooms", "/dalali", "/account", "/faq", "/privacy", "/terms", "/contact"];
+// Only public, indexable pages belong here. `/dalali` and `/account` are
+// authenticated dashboards that redirect to the login form.
+const BASE_PATHS = ["", "/rooms", "/faq", "/privacy", "/terms", "/contact"];
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date();

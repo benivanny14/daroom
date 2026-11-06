@@ -1,6 +1,6 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
-import { sendExpiryReminder } from "@/lib/email";
+import { emailConfigured, sendExpiryReminder } from "@/lib/email";
 import { prisma } from "@/lib/prisma";
 
 function validCronToken(request: NextRequest): boolean {
@@ -42,6 +42,20 @@ async function run(request: NextRequest) {
 
   let sent = 0;
   let failed = 0;
+
+  // Resend's sandbox sender can only reach the account owner. Trying to send
+  // would throw for every agent and mark the whole cron run as failed, so leave
+  // the reminders queued until a verified domain is configured.
+  if (!emailConfigured()) {
+    return NextResponse.json({
+      expired: expired.count,
+      sent: 0,
+      failed: 0,
+      skipped: due.length,
+      reason: "email_not_configured"
+    });
+  }
+
   for (const subscription of due) {
     const claimedAt = new Date();
     const claim = await prisma.subscription.updateMany({

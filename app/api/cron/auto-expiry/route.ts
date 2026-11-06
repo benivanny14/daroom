@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { deleteMediaObject, listMediaObjects } from "@/lib/storage";
 import { timingSafeCompare } from "@/lib/security";
 
 export const dynamic = "force-dynamic";
@@ -51,33 +52,34 @@ async function run(request: NextRequest) {
       }
     });
 
-    // Send expiry reminders (day 27)
-    const reminderSubscriptions = await prisma.subscription.findMany({
-      where: {
-        status: "ACTIVE",
-        endsAt: {
-          gte: new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000),
-          lte: new Date(now.getTime() + 4 * 24 * 60 * 60 * 1000)
-        },
-        reminderSentAt: null
-      },
-      include: {
-        user: true
-      }
-    });
-
-    if (process.env.RESEND_API_KEY) {
-      const { sendExpiryReminder } = await import("@/lib/email");
-      for (const sub of reminderSubscriptions) {
-        await sendExpiryReminder({
-          to: sub.user.email,
-          name: sub.user.name,
-          renewUrl: `${process.env.APP_URL}/dalali`
-        });
-        await prisma.subscription.update({
-          where: { id: sub.id },
-          data: { reminderSentAt: now }
-        });
+    // Delete uploads that were signed but never confirmed. A signed Supabase
+    // URL cannot enforce a byte limit, so an abandoned or rejected upload would
+    // otherwise sit in the bucket forever. Only objects older than 24 hours are
+    // considered, so an upload still in progress is never removed.
+    const mediaCutoff = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    const mediaObjects = await listMediaObjects("listings/");
+    const mediaCandidates = mediaObjects
+      .filter((object) => object.createdAt && object.createdAt < mediaCutoff)
+      .slice(0, 2000);
+    // Resolve every candidate against the database in one query, so an old but
+    // attached photo cannot hide an orphan that sits later in the list.
+    const attachedRows = mediaCandidates.length
+      ? await prisma.listingPhoto.findMany({
+          where: { storageKey: { in: mediaCandidates.map((object) => object.key) } },
+          select: { storageKey: true }
+        })
+      : [];
+    const attachedKeys = new Set(attachedRows.map((row) => row.storageKey));
+    const orphans = mediaCandidates
+      .filter((object) => !attachedKeys.has(object.key))
+      .slice(0, 40);
+    let mediaDeleted = 0;
+    for (const object of orphans) {
+      try {
+        await deleteMediaObject(object.key);
+        mediaDeleted += 1;
+      } catch {
+        // A failed delete is retried on the next run.
       }
     }
 
@@ -93,7 +95,7 @@ async function run(request: NextRequest) {
       expiredFeatured: expiredFeatured.count,
       expiredListings: expiredListings.count,
       expiredSubscriptions: expiredSubscriptions.count,
-      remindersSent: reminderSubscriptions.length,
+      mediaDeleted,
       staleRateLimitBuckets: staleBuckets.count
     });
 

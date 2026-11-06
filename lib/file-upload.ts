@@ -1,6 +1,18 @@
 import { z } from "zod";
+import { PHOTO_MAX_BYTES } from "./image-compress";
 
+/** Identity documents may be photographed at full phone resolution. */
 const MAX_FILE_SIZE = 15 * 1024 * 1024; // 15MB
+
+/**
+ * Listing photos are compressed in the browser to 300 KB before upload. The
+ * server accepts a little more than that target so an encoder that lands a few
+ * kilobytes over is not rejected, but a full-size 6 MB photo never gets stored.
+ */
+export const MAX_PHOTO_BYTES = PHOTO_MAX_BYTES;
+/** The size shown to agents: the hard ceiling the server enforces. */
+export const PHOTO_LIMIT_KB = Math.round(MAX_PHOTO_BYTES / 1024);
+
 const ALLOWED_MIME_TYPES = [
   "image/jpeg",
   "image/jpg",
@@ -60,6 +72,23 @@ export function validateFileUpload(file: FileUploadLike): { valid: boolean; erro
     return { valid: false, error: "The file extension does not match the photo type." };
   }
 
+  return { valid: true };
+}
+
+/**
+ * Listing-photo policy: the same image types as `validateFileUpload`, plus the
+ * 350 KB ceiling the browser compressor targets. Kept separate from identity
+ * documents, which are allowed to be full-resolution.
+ */
+export function validateListingPhoto(file: FileUploadLike): { valid: boolean; error?: string } {
+  const base = validateFileUpload(file);
+  if (!base.valid) return base;
+  if (file.size > MAX_PHOTO_BYTES) {
+    return {
+      valid: false,
+      error: `Photos must be ${PHOTO_LIMIT_KB} KB or smaller. Choose a smaller photo or try again.`
+    };
+  }
   return { valid: true };
 }
 

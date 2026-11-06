@@ -30,7 +30,22 @@ export async function enforceRateLimit(input: {
   return rows[0].attempts <= input.limit;
 }
 
+/**
+ * Best-effort client address for rate limiting. Platform headers are trusted
+ * first (Vercel sets `x-real-ip`, Netlify sets `x-nf-client-connection-ip`).
+ * `x-forwarded-for` is only a fallback, and the right-most entry is used because
+ * a client can prepend arbitrary values to the left side.
+ */
 export function clientIp(headers: Headers): string {
+  const platformIp =
+    headers.get("x-real-ip")?.trim() ||
+    headers.get("x-nf-client-connection-ip")?.trim();
+  if (platformIp) return platformIp;
+
   const forwardedFor = headers.get("x-forwarded-for");
-  return forwardedFor?.split(",")[0]?.trim() || headers.get("x-real-ip") || "unknown";
+  if (forwardedFor) {
+    const parts = forwardedFor.split(",").map((part) => part.trim()).filter(Boolean);
+    if (parts.length > 0) return parts[parts.length - 1];
+  }
+  return "unknown";
 }

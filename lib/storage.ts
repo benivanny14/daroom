@@ -432,3 +432,100 @@ export async function listObjects(prefix: string): Promise<string[]> {
   const response = await client.send(command);
   return response.Contents?.map(obj => obj.Key || "").filter(Boolean) || [];
 }
+
+export type MediaObject = { key: string; createdAt?: Date };
+
+/**
+ * Lists stored media under a prefix, including nested folders. The cleanup cron
+ * uses it to find uploads that never reached a `ListingPhoto` row. The walk is
+ * deliberately bounded: a runaway listing tree must not turn one cron run into
+ * hundreds of storage calls.
+ */
+async function listSupabaseObjects(prefix: string): Promise<MediaObject[]> {
+  const results: MediaObject[] = [];
+  const queue: string[] = [prefix.endsWith("/") ? prefix : `${prefix}/`];
+  let calls = 0;
+
+  while (queue.length > 0 && calls < 60) {
+    const current = queue.shift() as string;
+    let offset = 0;
+    for (let page = 0; page < 5; page += 1) {
+      const response = await fetch(
+        `${supabaseBaseUrl()}/storage/v1/object/list/${SUPABASE_STORAGE_BUCKET}`,
+        {
+          method: "POST",
+          headers: { ...supabaseHeaders(), "Content-Type": "application/json" },
+          body: JSON.stringify({
+            prefix: current,
+            limit: 1000,
+            offset,
+            sortBy: { column: "name", order: "asc" }
+          })
+        }
+      );
+      calls += 1;
+      if (!response.ok) return results;
+      const entries = (await response.json()) as Array<{
+        name?: string;
+        id?: string | null;
+        created_at?: string | null;
+      }>;
+      if (!Array.isArray(entries) || entries.length === 0) break;
+
+      for (const entry of entries) {
+        if (!entry.name) continue;
+        const key = `${current}${entry.name}`;
+        if (entry.id === null || entry.id === undefined) {
+          queue.push(`${key}/`);
+        } else {
+          results.push({
+            key,
+            createdAt: entry.created_at ? new Date(entry.created_at) : undefined
+          });
+        }
+      }
+      if (entries.length < 1000) break;
+      offset += entries.length;
+    }
+  }
+
+  return results;
+}
+
+async function listS3Objects(prefix: string): Promise<MediaObject[]> {
+  const { client, bucket } = objectStorage();
+  const results: MediaObject[] = [];
+  let continuationToken: string | undefined;
+
+  for (let page = 0; page < 10; page += 1) {
+    const response = await client.send(new ListObjectsV2Command({
+      Bucket: bucket,
+      Prefix: prefix,
+      ContinuationToken: continuationToken
+    }));
+    for (const object of response.Contents ?? []) {
+      if (object.Key) results.push({ key: object.Key, createdAt: object.LastModified });
+    }
+    if (!response.IsTruncated || !response.NextContinuationToken) break;
+    continuationToken = response.NextContinuationToken;
+  }
+
+  return results;
+}
+
+/** All media objects under a prefix, with creation time where the driver exposes it. */
+export async function listMediaObjects(prefix: string): Promise<MediaObject[]> {
+  if (localStorageEnabled()) return [];
+  if (supabaseStorageConfigured()) {
+    try {
+      return await listSupabaseObjects(prefix);
+    } catch {
+      return [];
+    }
+  }
+  try {
+    return await listS3Objects(prefix);
+  } catch {
+    return [];
+  }
+}

@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { generateStorageKey, sanitizeFileName, validateFileUpload } from "./file-upload";
+import {
+  MAX_PHOTO_BYTES,
+  PHOTO_LIMIT_KB,
+  generateStorageKey,
+  sanitizeFileName,
+  validateFileUpload,
+  validateListingPhoto
+} from "./file-upload";
 import { readJsonBody } from "./http";
 import { formatTanzaniaPhone, maskPhone, normalizeTanzaniaPhone } from "./phone";
 import { isSafeStorageKey } from "./storage";
@@ -15,22 +22,31 @@ import {
 
 const MB = 1024 * 1024;
 
-describe("photo upload policy", () => {
-  it("accepts a photo up to the 15 MB limit", () => {
-    expect(validateFileUpload({ type: "image/jpeg", size: 15 * MB, name: "room.jpg" }).valid).toBe(true);
-    expect(validateFileUpload({ type: "image/webp", size: 1 * MB, name: "room.webp" }).valid).toBe(true);
+describe("upload policy", () => {
+  it("allows identity documents up to 15 MB", () => {
+    expect(validateFileUpload({ type: "image/jpeg", size: 15 * MB, name: "id.jpg" }).valid).toBe(true);
+    expect(validateFileUpload({ type: "image/webp", size: 1 * MB, name: "id.webp" }).valid).toBe(true);
   });
 
-  it("rejects a photo one byte over the limit", () => {
-    const result = validateFileUpload({ type: "image/jpeg", size: 15 * MB + 1, name: "room.jpg" });
+  it("rejects an identity document one byte over 15 MB", () => {
+    const result = validateFileUpload({ type: "image/jpeg", size: 15 * MB + 1, name: "id.jpg" });
     expect(result.valid).toBe(false);
     expect(result.error).toContain("15MB");
+  });
+
+  it("caps listing photos at the compressed ceiling", () => {
+    expect(PHOTO_LIMIT_KB).toBe(350);
+    expect(validateListingPhoto({ type: "image/jpeg", size: MAX_PHOTO_BYTES, name: "room.jpg" }).valid).toBe(true);
+    const over = validateListingPhoto({ type: "image/jpeg", size: MAX_PHOTO_BYTES + 1, name: "room.jpg" });
+    expect(over.valid).toBe(false);
+    expect(over.error).toContain(String(PHOTO_LIMIT_KB));
   });
 
   it("rejects types and extensions that are not allowed", () => {
     expect(validateFileUpload({ type: "image/gif", size: 1024, name: "room.gif" }).valid).toBe(false);
     expect(validateFileUpload({ type: "image/png", size: 1024, name: "room.jpg" }).valid).toBe(false);
     expect(validateFileUpload({ type: "image/jpeg", size: 0, name: "room.jpg" }).valid).toBe(false);
+    expect(validateListingPhoto({ type: "video/mp4", size: 1024, name: "room.mp4" }).valid).toBe(false);
   });
 
   it("sanitises file names used in storage keys", () => {

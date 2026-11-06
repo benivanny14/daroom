@@ -45,6 +45,13 @@ export async function getListingDetail(id: string): Promise<ListingDetailData | 
 
   if (!listing) return null;
 
+  // The reviews list is capped at 30 for display, so the average must come from
+  // the whole table, not from the page that happens to be rendered.
+  const rating = await prisma.review.aggregate({
+    where: { listingId: listing.id },
+    _avg: { rating: true }
+  });
+
   const photos = listing.photos.flatMap((photo) => {
     const url = getMediaUrl(photo.storageKey);
     return url ? [{ id: photo.id, url, altText: photo.altText }] : [];
@@ -58,8 +65,8 @@ export async function getListingDetail(id: string): Promise<ListingDetailData | 
     createdAt: review.createdAt.toISOString()
   }));
 
-  const ratingAverage = reviews.length
-    ? Number((reviews.reduce((sum, review) => sum + review.rating, 0) / reviews.length).toFixed(1))
+  const ratingAverage = rating._avg.rating !== null
+    ? Number(rating._avg.rating.toFixed(1))
     : null;
 
   return {

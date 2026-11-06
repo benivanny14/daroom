@@ -146,7 +146,8 @@ No code change is needed.
   account favorites, and their viewing appointments.
 - `/dalali` is the agent dashboard: one subscription at TSh 5,000 / 30 days
   (no plan picker), listing create/edit/hide/restore, multi-photo upload (10
-  photos per listing, hard ceiling 10; 15 MB per photo), analytics,
+  photos per listing, hard ceiling 10; under 300 KB per photo after
+  browser compression), analytics,
   availability toggle, expiry and 60-day renewal, viewing management (bookings
   are confirmed immediately, with no agent approval step), and ID verification
   submission.
@@ -155,8 +156,12 @@ No code change is needed.
   whether the toilet is private or shared. Those details appear on the card and
   the listing page.
 - **Photos only.** The browser input, the presign API and the confirm step all
-  reject `video/*`; only JPEG, PNG and WebP are accepted. Large phone photos are
-  resized to 2000 px and re-encoded in the browser before upload.
+  reject `video/*`; only JPEG, PNG and WebP are accepted. Every photo is
+  re-encoded in the browser to at most 1600 px and 300 KB (WebP, JPEG fallback,
+  EXIF orientation kept) before upload; the presign and confirm steps reject
+  anything above 350 KB, so a full-size camera file cannot reach storage.
+- Photos are served through `next/image` with per-slot `sizes`/`quality`, so a
+  listing grid downloads ~25–40 KB thumbnails instead of the full file.
 - `/admin` is the moderation console: open reports, agent accounts and
   subscriptions, and the audit log. There is no listing approval step. An admin
   can grant one Agent **free access** (no subscription) to create listings and

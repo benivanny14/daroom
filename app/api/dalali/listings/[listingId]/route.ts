@@ -42,6 +42,17 @@ export async function PATCH(
     const { listingId } = await context.params;
     assertSameOrigin(request);
     const user = await requireAgent();
+
+    // Restore and the availability toggle are listing edits too, so an expired
+    // Agent must not use them as a way around the subscription check below.
+    const accessSubscription = await prisma.subscription.findFirst({
+      where: { userId: user.id },
+      orderBy: { endsAt: "desc" }
+    });
+    if (!hasListingWriteAccess(accessSubscription) && !user.freeAccess) {
+      return NextResponse.json({ error: "Your subscription has expired. Pay TSh 5,000 before editing a listing." }, { status: 403 });
+    }
+
     const rawBody = await readJsonBody(request, 16 * 1024);
     if (!rawBody.ok) return NextResponse.json({ error: "The data is invalid or too large." }, { status: rawBody.status });
 

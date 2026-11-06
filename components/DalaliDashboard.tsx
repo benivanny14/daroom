@@ -1,9 +1,9 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
-import Image from "next/image";
+import { PhotoImage } from "@/components/PhotoImage";
 import { AGENT_PLAN, AGENT_PLAN_ID, SUBSCRIPTION_PLANS, photoLimitForPlan } from "@/lib/subscriptions-plans";
-import { compressImage } from "@/lib/image-compress";
+import { compressImage, PHOTO_MAX_BYTES } from "@/lib/image-compress";
 
 type District = { id: string; name: string; neighborhoods: { id: string; name: string }[] };
 type Photo = { id: string; url?: string | null; altText: string };
@@ -84,7 +84,7 @@ type FormValues = {
   toiletMode: "PRIVATE" | "SHARED";
 };
 
-const MAX_PHOTO_BYTES = 15 * 1024 * 1024;
+const MAX_INPUT_PHOTO_BYTES = 15 * 1024 * 1024;
 const MAX_PHOTO_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
 
 function describePhoto(file: File, position: number) {
@@ -269,7 +269,7 @@ export function DalaliDashboard({
         problems.push(`${original.name}: use a JPEG, PNG or WebP photo.`);
         continue;
       }
-      if (original.size > MAX_PHOTO_BYTES) {
+      if (original.size > MAX_INPUT_PHOTO_BYTES) {
         problems.push(`${original.name}: must not exceed 15 MB.`);
         continue;
       }
@@ -278,6 +278,12 @@ export function DalaliDashboard({
         continue;
       }
       const file = await compressImage(original);
+      if (file.size > PHOTO_MAX_BYTES) {
+        problems.push(
+          `${original.name}: this browser could not shrink it below ${Math.round(PHOTO_MAX_BYTES / 1024)} KB. Try a smaller photo.`
+        );
+        continue;
+      }
       accepted.push({ file, url: URL.createObjectURL(file) });
     }
     if (accepted.length) setFormPhotos((current) => [...current, ...accepted]);
@@ -597,8 +603,13 @@ export function DalaliDashboard({
     if (!MAX_PHOTO_TYPES.includes(file.type)) {
       throw new Error("Use a JPEG, PNG, or WebP photo.");
     }
-    if (file.size > MAX_PHOTO_BYTES) {
+    if (file.size > MAX_INPUT_PHOTO_BYTES) {
       throw new Error("Photo must not exceed 15 MB.");
+    }
+    if (file.size > PHOTO_MAX_BYTES) {
+      throw new Error(
+        `This browser could not shrink the photo below ${Math.round(PHOTO_MAX_BYTES / 1024)} KB. Try a smaller photo.`
+      );
     }
     const presignResponse = await fetch(`/api/dalali/listings/${listingId}/photos`, {
       method: "POST",
@@ -1040,9 +1051,10 @@ export function DalaliDashboard({
             <fieldset className="form-photos">
               <legend>Photos</legend>
               <p className="fine-print">
-                Add up to {photoLimit} photos, 15 MB each (JPEG, PNG or WebP). The first
-                photo is the cover and tenants can browse the rest as a slideshow. Photos only —
-                videos are not accepted.
+                Add up to {photoLimit} photos (JPEG, PNG or WebP). Each photo is compressed to
+                about 300 KB automatically (350 KB maximum), so you can pick the original camera
+                photo. The first photo is the cover and tenants can browse the rest as a slideshow.
+                Photos only — videos are not accepted.
               </p>
 
               {editingListing && editingListing.photos.length > 0 && (
@@ -1050,7 +1062,7 @@ export function DalaliDashboard({
                   {editingListing.photos.map((photo, photoIndex) => (
                     <figure className="form-photo" key={photo.id}>
                       {photo.url
-                        ? <Image src={photo.url} alt={photo.altText} width={160} height={110} unoptimized />
+                        ? <PhotoImage src={photo.url} alt={photo.altText} width={160} height={110} sizes="160px" quality={60} />
                         : <span>{photo.altText}</span>}
                       <figcaption>{photoIndex === 0 ? "Cover" : `Photo ${photoIndex + 1}`}</figcaption>
                       <button
@@ -1145,7 +1157,7 @@ export function DalaliDashboard({
                 ) : listing.photos.map((photo) => (
                   <figure className="photo-tile" key={photo.id}>
                     {photo.url
-                      ? <Image src={photo.url} alt={photo.altText} width={180} height={120} unoptimized />
+                      ? <PhotoImage src={photo.url} alt={photo.altText} width={180} height={120} sizes="180px" quality={60} />
                       : <span>{photo.altText}</span>}
                     <figcaption title={photo.altText}>{photo.altText}</figcaption>
                     <div className="photo-tile-actions">
@@ -1171,8 +1183,9 @@ export function DalaliDashboard({
               </div>
               <p className="fine-print">
                 Select several photos at once. Up to {photoLimit} photos per listing, 15 MB each
-                (JPEG, PNG, or WebP). Photos only — videos are not accepted. The first photo is used
-                as the cover, and tenants can browse the rest as a slideshow.
+                before compression (JPEG, PNG, or WebP). Photos only — videos are not accepted.
+                The first photo is used as the cover, and tenants can browse the rest as a
+                slideshow.
               </p>
               <div className="listing-details">
                 <span>Bedrooms: {listing.bedrooms || "N/A"}</span>

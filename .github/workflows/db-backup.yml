@@ -3,7 +3,9 @@ name: Database backup
 # Run manually from the Actions tab. Add `SUPABASE_DB_URL` as a repository
 # secret first: Supabase dashboard -> Project Settings -> Database -> Connection
 # string (URI, session pooler, port 5432). The dump is uploaded as an artifact
-# and kept for 30 days; download it and store it somewhere durable.
+# and kept for 90 days; download it and store it somewhere durable. GitHub can
+# disable scheduled workflows after 60 days without repository activity, so
+# treat this as a safety net, not the only backup.
 on:
   workflow_dispatch:
   schedule:
@@ -43,4 +45,5 @@ jobs:
         with:
           name: darroom-db-${{ github.run_id }}
           path: backup/*.dump
-          retention-days: 30
+          retention-days: 90
+          if-no-files-found: error

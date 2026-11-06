@@ -8,7 +8,7 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
   type TouchEvent as ReactTouchEvent
 } from "react";
-import Image from "next/image";
+import { PhotoImage } from "@/components/PhotoImage";
 
 type ListingPhoto = { id: string; url: string; altText: string };
 
@@ -113,13 +113,18 @@ export function ListingPhotos({
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
       >
-        <Image
+        <PhotoImage
           src={active.url}
           alt={active.altText}
           className="listing-photo"
           width={1200}
           height={800}
-          unoptimized
+          sizes={
+            full
+              ? "(max-width: 760px) 100vw, 760px"
+              : "(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 384px"
+          }
+          quality={full ? 75 : 70}
           priority={full}
         />
         <span className="art-label">{featured ? "Featured" : "Listing"}</span>
@@ -165,7 +170,14 @@ export function ListingPhotos({
                 aria-current={photoIndex === index}
                 onClick={() => go(photoIndex)}
               >
-                <Image src={photo.url} alt="" width={160} height={110} unoptimized />
+                <PhotoImage
+                  src={photo.url}
+                  alt=""
+                  width={160}
+                  height={110}
+                  sizes="160px"
+                  quality={60}
+                />
               </button>
             ))}
           </div>

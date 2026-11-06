@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { assertSameOrigin, authErrorResponse, requireAgent } from "@/lib/auth";
 import { readJsonBody } from "@/lib/http";
 import { prisma } from "@/lib/prisma";
-import { hasFeaturedSlots } from "@/lib/subscriptions-plans";
+import { hasListingWriteAccess } from "@/lib/subscriptions";
+import { AGENT_PLAN_ID, hasFeaturedSlots } from "@/lib/subscriptions-plans";
 import { withRateLimit } from "@/lib/rate-limit-middleware";
 import { setSecurityHeaders } from "@/lib/security";
 
@@ -38,18 +39,18 @@ export async function POST(
         return NextResponse.json({ error: "You do not have permission to feature this listing." }, { status: 403 });
       }
 
-      // Check subscription
+      // Check subscription. An admin-granted free-access Agent may feature a
+      // room without a paid period, using the same slot rules as the paid plan.
       const subscription = await prisma.subscription.findFirst({
-        where: {
-          userId: user.id,
-          status: "ACTIVE",
-          endsAt: { gte: new Date() }
-        }
+        where: { userId: user.id },
+        orderBy: { endsAt: "desc" }
       });
 
-      if (!subscription) {
+      if (!hasListingWriteAccess(subscription) && !user.freeAccess) {
         return NextResponse.json({ error: "You need an active subscription." }, { status: 400 });
       }
+
+      const planId = subscription?.plan ?? AGENT_PLAN_ID;
 
       // Check featured slots
       const featuredCount = await prisma.listing.count({
@@ -60,7 +61,7 @@ export async function POST(
         }
       });
 
-      if (!hasFeaturedSlots(featuredCount, subscription.plan)) {
+      if (!hasFeaturedSlots(featuredCount, planId)) {
         return NextResponse.json({ error: "You have reached the maximum number of featured listings for your plan." }, { status: 400 });
       }
 

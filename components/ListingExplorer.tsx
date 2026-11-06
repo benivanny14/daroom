@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import Image from "next/image";
+import { PhotoImage } from "@/components/PhotoImage";
 import Link from "next/link";
 import {
   type Listing
@@ -341,7 +341,7 @@ export function ListingExplorer({ heroImage }: { heroImage?: string | null }) {
           </div>
         </div>
         <div className={`hero-visual${heroImage ? " has-photo" : ""}`} aria-label={heroImage ? "Photo chosen by DarRoom" : "Illustration of Dar es Salaam homes"} role="img">
-          {heroImage && <Image className="hero-photo" src={heroImage} alt="" width={1200} height={800} unoptimized priority />}
+          {heroImage && <PhotoImage className="hero-photo" src={heroImage} alt="" width={1200} height={800} sizes="(max-width: 940px) 100vw, 520px" quality={75} priority />}
           <span className="sun" />
           <span className="hero-horizon" />
           <div className="hero-stamp">

@@ -1,7 +1,8 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
-import Image from "next/image";
+import { PhotoImage } from "@/components/PhotoImage";
+import { compressImage, HERO_MAX_BYTES } from "@/lib/image-compress";
 
 type ReportListing = {
   id: string;
@@ -277,8 +278,8 @@ export function AdminConsole() {
     } catch (caught) { setError(caught instanceof Error ? caught.message : "Action failed."); }
   }
 
-  async function uploadHero(file: File) {
-    if (file.size > 15 * 1024 * 1024) {
+  async function uploadHero(original: File) {
+    if (original.size > 15 * 1024 * 1024) {
       setError("The image must not exceed 15 MB.");
       return;
     }
@@ -286,6 +287,14 @@ export function AdminConsole() {
     setError("");
     setMessage("");
     try {
+      // The home page image is shrunk with the same pass as listing photos so a
+      // page view never downloads a multi-megabyte camera file.
+      const file = await compressImage(original);
+      if (file.size > HERO_MAX_BYTES) {
+        throw new Error(
+          `This browser could not shrink the image below ${Math.round(HERO_MAX_BYTES / 1024)} KB. Try a smaller file.`
+        );
+      }
       const presign = await fetch("/api/admin/site/hero", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -781,12 +790,14 @@ export function AdminConsole() {
                 <h2>Hero image</h2>
                 <p className="panel-subtitle">
                   This photo is shown behind “Welcome home.” at the top of the home page.
-                  JPEG, PNG or WebP, up to 15 MB. Remove it to show the default illustration.
+                  JPEG, PNG or WebP, up to 15 MB before compression. The browser shrinks it
+              automatically; the stored image stays under 500 KB. Remove it to show the
+              default illustration.
                 </p>
               </div>
             </div>
             {heroImage ? (
-              <figure className="hero-preview"><Image src={heroImage} alt="Current home page hero" width={1200} height={600} unoptimized /></figure>
+              <figure className="hero-preview"><PhotoImage src={heroImage} alt="Current home page hero" width={1200} height={600} sizes="(max-width: 900px) 100vw, 600px" quality={72} /></figure>
             ) : (
               <p className="empty">No custom image yet. The default illustration is shown.</p>
             )}
